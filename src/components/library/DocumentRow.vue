@@ -6,12 +6,16 @@ import type { DocumentEntry, DocumentProgress } from '../../../shared/types'
 import { formatWhen } from '../../lib/format'
 import { summarizeProgress } from '../../lib/progressSummary'
 
-const props = defineProps<{
-  document: DocumentEntry
-  progress: DocumentProgress | null
-  bookmarks: number
-  highlights: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    document: DocumentEntry
+    progress: DocumentProgress | null
+    bookmarks: number
+    highlights: number
+    showFolder?: boolean
+  }>(),
+  { showFolder: true },
+)
 
 const summary = computed(() => summarizeProgress(props.progress ?? undefined))
 </script>
@@ -21,7 +25,7 @@ const summary = computed(() => summarizeProgress(props.progress ?? undefined))
     <RouterLink class="row" :to="{ name: 'read', query: { path: document.path } }">
       <span class="name">
         <strong>{{ document.name }}</strong>
-        <small v-if="document.folder">{{ document.folder }}</small>
+        <small v-if="showFolder && document.folder">{{ document.folder }}</small>
       </span>
       <span class="progress">
         <span class="track"><span :style="{ width: `${summary.ratio * 100}%` }" /></span>

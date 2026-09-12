@@ -5,10 +5,13 @@ import { RouterLink } from 'vue-router'
 import SearchButton from '../components/common/SearchButton.vue'
 import DocumentRow from '../components/library/DocumentRow.vue'
 import OrphanRecords from '../components/library/OrphanRecords.vue'
+import ProjectCard from '../components/library/ProjectCard.vue'
 import ResumeCard from '../components/library/ResumeCard.vue'
+import { useDocumentRows } from '../composables/useDocumentRows'
 import { reportError } from '../composables/useNotices'
 import { useSearchDialog } from '../composables/useSearchDialog'
 import { useStudyStore } from '../composables/useStudyStore'
+import { groupIntoProjects } from '../lib/projects'
 
 const store = useStudyStore()
 const search = useSearchDialog()
@@ -17,14 +20,11 @@ onMounted(() => {
   if (store.state.loaded) store.refreshDocuments().catch(reportError)
 })
 
-const rows = computed(() =>
-  store.state.documents.map((document) => ({
-    document,
-    progress: store.state.progress[document.path] ?? null,
-    bookmarks: store.state.bookmarks.filter((item) => item.path === document.path).length,
-    highlights: store.state.highlights.filter((item) => item.path === document.path).length,
-  })),
+// プロジェクト = 資料フォルダ直下のフォルダ。フォルダが1つも無ければ今までどおりの一覧になる
+const shelf = computed(() =>
+  groupIntoProjects(store.state.documents, store.state.progress, store.state.bookmarks, store.state.highlights),
 )
+const looseRows = useDocumentRows(computed(() => shelf.value.loose))
 
 const resume = computed(() => {
   const progress = store.latestProgress.value
@@ -53,11 +53,26 @@ const resume = computed(() => {
       <p v-if="!store.state.loaded" class="empty">資料フォルダを読み込んでいます…</p>
       <template v-else>
         <ResumeCard v-if="resume" :document="resume.document" :progress="resume.progress" />
-        <section aria-labelledby="documents-title" class="documents">
-          <h2 id="documents-title" class="section-title">資料 <span class="num">{{ rows.length }}</span></h2>
-          <p v-if="rows.length === 0" class="empty">資料フォルダに HTML の教材がありません。</p>
+        <section v-if="shelf.projects.length > 0" aria-labelledby="projects-title" class="projects">
+          <h2 id="projects-title" class="section-title">
+            プロジェクト <span class="num">{{ shelf.projects.length }}</span>
+          </h2>
+          <ul class="cards">
+            <ProjectCard v-for="project in shelf.projects" :key="project.folder" :project="project" />
+          </ul>
+        </section>
+        <section
+          v-if="looseRows.length > 0 || shelf.projects.length === 0"
+          aria-labelledby="documents-title"
+          class="documents"
+        >
+          <h2 id="documents-title" class="section-title">
+            {{ shelf.projects.length > 0 ? 'フォルダに入れていない資料' : '資料' }}
+            <span class="num">{{ looseRows.length }}</span>
+          </h2>
+          <p v-if="looseRows.length === 0" class="empty">資料フォルダに HTML の教材がありません。</p>
           <ul v-else class="rows">
-            <DocumentRow v-for="row in rows" :key="row.document.path" v-bind="row" />
+            <DocumentRow v-for="row in looseRows" :key="row.document.path" v-bind="row" />
           </ul>
         </section>
         <OrphanRecords v-if="store.orphanRecords.value.length > 0" :records="store.orphanRecords.value" :documents="store.state.documents" />
@@ -140,6 +155,20 @@ h1 {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
+}
+
+.projects {
+  display: grid;
+  gap: 10px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .rows {

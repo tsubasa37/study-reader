@@ -17,6 +17,12 @@ export const router = createRouter({
         highlightId: single(route.query.highlight),
       }),
     },
+    {
+      path: '/project',
+      name: 'project',
+      component: () => import('./pages/ProjectPage.vue'),
+      props: (route) => ({ folder: single(route.query.folder) ?? '' }),
+    },
     { path: '/notes', name: 'notes', component: () => import('./pages/NotesPage.vue') },
   ],
 })
