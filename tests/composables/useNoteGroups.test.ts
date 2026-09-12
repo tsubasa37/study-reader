@@ -98,12 +98,4 @@ describe('useNoteGroups', () => {
     expect(useNoteGroups(filter({ text: 'あとで' }), ref([])).total.value).toBe(1)
   })
 
-  it('資料フォルダに無い資料は「ファイルが見つからない」印を付ける', () => {
-    const store = useStudyStore()
-    store.state.bookmarks = [...store.state.bookmarks, bookmark('b2', '消えた.html')]
-
-    const { groups } = useNoteGroups(filter(), ref([]))
-
-    expect(groups.value.find((group) => group.path === '消えた.html')?.missing).toBe(true)
-  })
 })

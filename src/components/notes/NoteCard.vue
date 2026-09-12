@@ -7,14 +7,14 @@ import { NO_EXCERPT, NO_SECTION } from '../../lib/labels'
 import type { NoteListEntry } from '../../types/ui'
 import HighlightQuote from '../common/HighlightQuote.vue'
 
-const props = defineProps<{ entry: NoteListEntry; openable: boolean }>()
+const props = defineProps<{ entry: NoteListEntry }>()
 
 const target = computed(() => ({ name: 'read', query: { path: props.entry.path, [props.entry.kind]: props.entry.id } }))
 </script>
 
 <template>
   <li class="note-item card">
-    <component :is="openable ? RouterLink : 'div'" class="note-go" v-bind="openable ? { to: target } : {}">
+    <RouterLink class="note-go" :to="target">
       <span class="note-where">
         <Highlighter v-if="entry.kind === 'highlight'" :size="12" />
         <Bookmark v-else :size="12" />
@@ -22,7 +22,7 @@ const target = computed(() => ({ name: 'read', query: { path: props.entry.path, 
       </span>
       <HighlightQuote v-if="entry.kind === 'highlight' && entry.color" :text="entry.text" :color="entry.color" />
       <span v-else class="excerpt">{{ entry.text || NO_EXCERPT }}</span>
-    </component>
+    </RouterLink>
     <p v-if="entry.memo" class="memo">{{ entry.memo }}</p>
     <div class="note-meta">
       <span class="num">{{ formatWhen(entry.createdAt) }}</span>

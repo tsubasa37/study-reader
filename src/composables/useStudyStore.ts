@@ -9,12 +9,9 @@ import type {
   MoveDocumentResult,
   NewBookmark,
   NewHighlight,
-  RecordsMove,
-  RecordsSummary,
 } from '../../shared/types'
 import { api } from '../lib/api'
 import { projectFolderOf } from '../lib/projects'
-import type { OrphanRecord } from '../types/ui'
 
 type StoreState = {
   loaded: boolean
@@ -109,18 +106,6 @@ async function moveDocument(path: string, folder: string): Promise<MoveDocumentR
   return result
 }
 
-async function moveRecords(move: RecordsMove): Promise<RecordsSummary> {
-  const summary = await api.moveRecords(move)
-  await reloadAll()
-  return summary
-}
-
-async function deleteRecords(path: string): Promise<RecordsSummary> {
-  const summary = await api.deleteRecords(path)
-  await reloadAll()
-  return summary
-}
-
 const projectFolders = computed(() =>
   [...new Set(state.documents.map((document) => projectFolderOf(document.path)))]
     .filter((folder) => folder !== '')
@@ -135,30 +120,12 @@ const latestProgress = computed<DocumentProgress | null>(() => {
   return opened[0] ?? null
 })
 
-const orphanRecords = computed<OrphanRecord[]>(() => {
-  const paths = new Set([
-    ...Object.keys(state.progress),
-    ...state.bookmarks.map((item) => item.path),
-    ...state.highlights.map((item) => item.path),
-  ])
-  return [...paths]
-    .filter((path) => !documentsByPath.value.has(path))
-    .sort((a, b) => a.localeCompare(b, 'ja'))
-    .map((path) => ({
-      path,
-      hasProgress: state.progress[path] !== undefined,
-      bookmarks: state.bookmarks.filter((item) => item.path === path).length,
-      highlights: state.highlights.filter((item) => item.path === path).length,
-    }))
-})
-
 export function useStudyStore() {
   return {
     state,
     documentsByPath,
     projectFolders,
     latestProgress,
-    orphanRecords,
     loadStudyState,
     refreshDocuments,
     saveProgress,
@@ -169,7 +136,5 @@ export function useStudyStore() {
     updateHighlight,
     deleteHighlight,
     moveDocument,
-    moveRecords,
-    deleteRecords,
   }
 }

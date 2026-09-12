@@ -42,7 +42,6 @@ export function useNoteGroups(filter: Ref<NoteFilter>, indexed: Ref<IndexedDocum
       .map(([groupPath, groupEntries]) => ({
         path: groupPath,
         name: store.documentsByPath.value.get(groupPath)?.name ?? groupPath,
-        missing: !store.documentsByPath.value.has(groupPath),
         entries: groupEntries.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       }))
       .sort((a, b) => (order.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.path) ?? Number.MAX_SAFE_INTEGER))

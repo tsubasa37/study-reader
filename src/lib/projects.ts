@@ -23,10 +23,6 @@ export function projectFolderOf(path: string): string {
   return index === -1 ? '' : path.slice(0, index)
 }
 
-function fileNameOf(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1)
-}
-
 function summarize(
   folder: string,
   documents: DocumentEntry[],
@@ -89,9 +85,3 @@ export function groupIntoProjects(
   return { projects, loose }
 }
 
-// フォルダへ移した資料は「見つからない記録」になる。同じファイル名が1つだけあれば引き継ぎ先の候補にする
-export function suggestMoveTarget(orphanPath: string, documents: readonly DocumentEntry[]): string | null {
-  const name = fileNameOf(orphanPath)
-  const matches = documents.filter((document) => fileNameOf(document.path) === name)
-  return matches.length === 1 ? (matches[0]?.path ?? null) : null
-}

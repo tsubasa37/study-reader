@@ -4,7 +4,6 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import SearchButton from '../components/common/SearchButton.vue'
 import DocumentRow from '../components/library/DocumentRow.vue'
-import OrphanRecords from '../components/library/OrphanRecords.vue'
 import ProjectCard from '../components/library/ProjectCard.vue'
 import ResumeCard from '../components/library/ResumeCard.vue'
 import { useDocumentRows } from '../composables/useDocumentRows'
@@ -75,7 +74,6 @@ const resume = computed(() => {
             <DocumentRow v-for="row in looseRows" :key="row.document.path" v-bind="row" />
           </ul>
         </section>
-        <OrphanRecords v-if="store.orphanRecords.value.length > 0" :records="store.orphanRecords.value" :documents="store.state.documents" />
       </template>
     </main>
   </div>

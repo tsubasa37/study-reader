@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import {
+  ArchiveFileSchema,
   BookmarksFileSchema,
   HighlightsFileSchema,
   ProgressFileSchema,
@@ -9,8 +10,8 @@ import {
   type HighlightsFile,
   type NewBookmark,
   type NewHighlight,
+  type ArchiveFile,
   type ProgressFile,
-  type RecordsMove,
 } from '../shared/schemas'
 import type { RecordsSummary, StudyState } from '../shared/types'
 import { HttpError } from './errors'
@@ -83,6 +84,13 @@ export function createStudyRepository(vaultDir: string) {
     version: 1,
     items: [],
   }))
+  // 資料フォルダから消えた資料の記録。画面には出さず、同じ名前の資料が戻れば元に戻す
+  const archiveStore = new JsonStore<ArchiveFile>(join(dir, 'archive.json'), ArchiveFileSchema, () => ({
+    version: 1,
+    progress: {},
+    bookmarks: [],
+    highlights: [],
+  }))
 
   const bookmarks = createCollection<NewBookmark>(bookmarkStore, 'しおりが見つかりません')
   const highlights = createCollection<NewHighlight>(highlightStore, 'ハイライトが見つかりません')
@@ -106,12 +114,6 @@ export function createStudyRepository(vaultDir: string) {
   }
 
   const isEmpty = (summary: RecordsSummary) => summary.progress + summary.bookmarks + summary.highlights === 0
-
-  async function summarize(path: string): Promise<RecordsSummary> {
-    const summary = await countRecords(path)
-    if (isEmpty(summary)) throw new HttpError(404, `${path} の記録はありません`)
-    return summary
-  }
 
   async function relocate(from: string, to: string): Promise<void> {
     await progress.update((file) => {
@@ -138,12 +140,6 @@ export function createStudyRepository(vaultDir: string) {
       }))
     },
 
-    async moveRecords({ from, to }: RecordsMove): Promise<RecordsSummary> {
-      const summary = await summarize(from)
-      await relocate(from, to)
-      return summary
-    },
-
     // 資料そのものを移したときの付け替え。まだ記録が無い資料でも失敗しない
     async relocateRecords(from: string, to: string): Promise<RecordsSummary> {
       const summary = await countRecords(from)
@@ -151,8 +147,23 @@ export function createStudyRepository(vaultDir: string) {
       return summary
     },
 
-    async deleteRecords(path: string): Promise<RecordsSummary> {
-      const summary = await summarize(path)
+    // 資料フォルダから消えた資料の記録を、画面に出さない置き場へ移す（消しはしない）
+    async archiveRecords(path: string): Promise<RecordsSummary> {
+      const summary = await countRecords(path)
+      if (isEmpty(summary)) return summary
+      const current = await state()
+      const entry = current.progress[path]
+      const movedBookmarks = current.bookmarks.filter((item) => item.path === path)
+      const movedHighlights = current.highlights.filter((item) => item.path === path)
+      await archiveStore.update((file) => ({
+        next: {
+          ...file,
+          progress: entry === undefined ? file.progress : { ...file.progress, [path]: entry },
+          bookmarks: [...file.bookmarks.filter((item) => item.path !== path), ...movedBookmarks],
+          highlights: [...file.highlights.filter((item) => item.path !== path), ...movedHighlights],
+        },
+        result: undefined,
+      }))
       await progress.update((file) => {
         const documents = { ...file.documents }
         delete documents[path]
@@ -161,6 +172,63 @@ export function createStudyRepository(vaultDir: string) {
       await bookmarks.removeByPath(path)
       await highlights.removeByPath(path)
       return summary
+    },
+
+    // しまっておいた記録を、戻ってきた資料に結び付け直す
+    async restoreArchived(archivedPath: string, to: string): Promise<RecordsSummary> {
+      const archive = await archiveStore.read()
+      const entry = archive.progress[archivedPath]
+      const movedBookmarks = archive.bookmarks.filter((item) => item.path === archivedPath)
+      const movedHighlights = archive.highlights.filter((item) => item.path === archivedPath)
+      const summary = {
+        progress: entry === undefined ? 0 : 1,
+        bookmarks: movedBookmarks.length,
+        highlights: movedHighlights.length,
+      }
+      if (isEmpty(summary)) return summary
+      if (entry !== undefined) {
+        await progress.update((file) => ({
+          next: {
+            ...file,
+            documents: { ...file.documents, [to]: mergeProgress(entry, file.documents[to], to) },
+          },
+          result: undefined,
+        }))
+      }
+      const stamp = timestamp()
+      await bookmarkStore.update((file) => ({
+        next: { ...file, items: [...file.items, ...movedBookmarks.map((item) => ({ ...item, path: to, updatedAt: stamp }))] },
+        result: undefined,
+      }))
+      await highlightStore.update((file) => ({
+        next: { ...file, items: [...file.items, ...movedHighlights.map((item) => ({ ...item, path: to, updatedAt: stamp }))] },
+        result: undefined,
+      }))
+      await archiveStore.update((file) => {
+        const remaining = { ...file.progress }
+        delete remaining[archivedPath]
+        return {
+          next: {
+            ...file,
+            progress: remaining,
+            bookmarks: file.bookmarks.filter((item) => item.path !== archivedPath),
+            highlights: file.highlights.filter((item) => item.path !== archivedPath),
+          },
+          result: undefined,
+        }
+      })
+      return summary
+    },
+
+    async archivedPaths(): Promise<string[]> {
+      const archive = await archiveStore.read()
+      return [
+        ...new Set([
+          ...Object.keys(archive.progress),
+          ...archive.bookmarks.map((item) => item.path),
+          ...archive.highlights.map((item) => item.path),
+        ]),
+      ]
     },
   }
 }

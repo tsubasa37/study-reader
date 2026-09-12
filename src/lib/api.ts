@@ -10,8 +10,6 @@ import type {
   MoveDocumentResult,
   NewBookmark,
   NewHighlight,
-  RecordsMove,
-  RecordsSummary,
   StudyState,
 } from '../../shared/types'
 
@@ -67,8 +65,6 @@ export const api = {
   deleteHighlight: (id: string) => request<void>('DELETE', `/api/highlights/${encodeURIComponent(id)}`),
 
   moveDocument: (input: MoveDocument) => request<MoveDocumentResult>('POST', '/api/documents/move', input),
-  moveRecords: (move: RecordsMove) => request<RecordsSummary>('POST', '/api/records/move', move),
-  deleteRecords: (path: string) => request<RecordsSummary>('DELETE', `/api/records?path=${encodeURIComponent(path)}`),
 
   async documentHtml(path: string): Promise<string> {
     const url = vaultUrl(path)

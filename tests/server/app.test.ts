@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Hono } from 'hono'
@@ -195,58 +195,58 @@ describe('ハイライト', () => {
   })
 })
 
-describe('記録の引き継ぎ', () => {
-  it('無くなったファイルの記録を、別の資料へまとめて移す', async () => {
-    await seedRecords('old.html', { bookmarks: 1, highlights: 1 })
+describe('記録はフォルダの中身に自動で合わせる', () => {
+  it('Finder で資料を移しても、記録が自動で追いつく', async () => {
+    await send('PUT', '/api/progress', progress())
+    await send('POST', '/api/bookmarks', bookmark())
+    await mkdir(join(vault.dir, 'アプリ開発'), { recursive: true })
+    await rename(join(vault.dir, DOC), join(vault.dir, 'アプリ開発', DOC))
 
-    const response = await send('POST', '/api/records/move', { from: 'old.html', to: DOC })
-
-    expect(await response.json()).toEqual({ progress: 1, bookmarks: 1, highlights: 1 })
     const current = await state()
-    expect(current.progress['old.html']).toBeUndefined()
-    expect(current.progress[DOC]?.path).toBe(DOC)
-    expect(current.bookmarks[0]?.path).toBe(DOC)
-    expect(current.highlights[0]?.path).toBe(DOC)
+
+    expect(current.progress[DOC]).toBeUndefined()
+    expect(current.progress[`アプリ開発/${DOC}`]?.readSectionIds).toEqual(['t-start'])
+    expect(current.bookmarks[0]?.path).toBe(`アプリ開発/${DOC}`)
   })
 
-  it('引き継ぎ先にも進み具合があれば、新しい方の位置を残し既読の章を合わせる', async () => {
-    await seedRecords('old.html', {
-      progress: {
-        lastOpenedAt: '2026-09-10T00:00:00.000Z',
-        readSectionIds: ['a'],
-        position: { sectionId: 'a', sectionOffset: 0, scrollRatio: 0 },
-      },
-    })
-    await send(
-      'PUT',
-      '/api/progress',
-      progress({ readSectionIds: ['b'], position: { sectionId: 'b', sectionOffset: 0, scrollRatio: 0.5 } }),
-    )
+  it('資料を消すと記録は画面から消え、しまっておく置き場へ移る', async () => {
+    await send('PUT', '/api/progress', progress())
+    await rm(join(vault.dir, DOC))
 
-    await send('POST', '/api/records/move', { from: 'old.html', to: DOC })
+    const current = await state()
 
-    const merged = (await state()).progress[DOC]
-    expect(merged?.position.sectionId).toBe('b')
-    expect([...(merged?.readSectionIds ?? [])].sort()).toEqual(['a', 'b'])
+    expect(current.progress).toEqual({})
+    const archive = JSON.parse(await readFile(join(vault.dir, '.study', 'archive.json'), 'utf8')) as {
+      progress: Record<string, unknown>
+    }
+    expect(archive.progress[DOC]).toBeDefined()
   })
 
-  it('引き継ぎ先の資料が無ければ 400', async () => {
-    await seedRecords('old.html')
+  it('同じ名前で資料が戻ってくると、記録も戻る', async () => {
+    await send('PUT', '/api/progress', progress())
+    const html = await readFile(join(vault.dir, DOC), 'utf8')
+    await rm(join(vault.dir, DOC))
+    await state()
 
-    expect((await send('POST', '/api/records/move', { from: 'old.html', to: 'missing.html' })).status).toBe(400)
+    await mkdir(join(vault.dir, '新しいフォルダ'), { recursive: true })
+    await writeFile(join(vault.dir, '新しいフォルダ', DOC), html, 'utf8')
+    const current = await state()
+
+    expect(current.progress[`新しいフォルダ/${DOC}`]?.readSectionIds).toEqual(['t-start'])
   })
 
-  it('引き継ぐ記録が無ければ 404', async () => {
-    expect((await send('POST', '/api/records/move', { from: 'old.html', to: DOC })).status).toBe(404)
-  })
+  it('同じ名前の資料が複数あるときは勝手に結び付けない', async () => {
+    await seedRecords('どこか/教材.html', { bookmarks: 1 })
+    await mkdir(join(vault.dir, 'A'), { recursive: true })
+    await mkdir(join(vault.dir, 'B'), { recursive: true })
+    await writeFile(join(vault.dir, 'A', '教材.html'), '<p>A</p>', 'utf8')
+    await writeFile(join(vault.dir, 'B', '教材.html'), '<p>B</p>', 'utf8')
 
-  it('記録を削除できる', async () => {
-    await seedRecords('old.html', { bookmarks: 1 })
+    const current = await state()
 
-    const response = await send('DELETE', `/api/records?path=${encodeURIComponent('old.html')}`)
-
-    expect(await response.json()).toEqual({ progress: 1, bookmarks: 1, highlights: 0 })
-    expect(await state()).toEqual({ progress: {}, bookmarks: [], highlights: [] })
+    expect(current.progress['A/教材.html']).toBeUndefined()
+    expect(current.progress['B/教材.html']).toBeUndefined()
+    expect(current.bookmarks).toEqual([])
   })
 })
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, CircleAlert } from '@lucide/vue'
+import { ArrowLeft } from '@lucide/vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import SearchButton from '../components/common/SearchButton.vue'
@@ -47,10 +47,9 @@ onMounted(async () => {
       <section v-for="group in groups" :key="group.path" class="group" :aria-label="group.name">
         <h2>
           {{ group.name }}
-          <span v-if="group.missing" class="missing"><CircleAlert :size="13" />ファイルが見つかりません（本棚で引き継げます）</span>
         </h2>
         <ul class="note-list">
-          <NoteCard v-for="entry in group.entries" :key="entry.id" :entry="entry" :openable="!group.missing" />
+          <NoteCard v-for="entry in group.entries" :key="entry.id" :entry="entry" />
         </ul>
       </section>
     </main>

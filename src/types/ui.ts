@@ -2,13 +2,6 @@ import type { HighlightColor, TextQuote } from '../../shared/types'
 import type { DocSection } from '../lib/sections'
 import type { TextMap } from '../lib/textMap'
 
-export type OrphanRecord = {
-  path: string
-  hasProgress: boolean
-  bookmarks: number
-  highlights: number
-}
-
 export type PanelTab = 'toc' | 'bookmarks' | 'highlights'
 
 export type ReaderSession = {
@@ -70,7 +63,6 @@ export type NoteHit = NoteEntry & { name: string }
 export type NoteGroup = {
   path: string
   name: string
-  missing: boolean
   entries: NoteListEntry[]
 }
 

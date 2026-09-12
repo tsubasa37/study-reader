@@ -103,6 +103,14 @@ export const HighlightsFileSchema = z.object({
   items: z.array(HighlightSchema),
 })
 
+// 資料フォルダから消えた資料の記録を、画面に出さずにしまっておく置き場
+export const ArchiveFileSchema = z.object({
+  version: z.literal(1),
+  progress: z.record(z.string(), DocumentProgressSchema),
+  bookmarks: z.array(BookmarkSchema),
+  highlights: z.array(HighlightSchema),
+})
+
 export type ReadingPosition = z.infer<typeof ReadingPositionSchema>
 export type DocumentProgress = z.infer<typeof DocumentProgressSchema>
 export type TextQuote = z.infer<typeof TextQuoteSchema>
@@ -117,3 +125,4 @@ export type MoveDocument = z.infer<typeof MoveDocumentSchema>
 export type ProgressFile = z.infer<typeof ProgressFileSchema>
 export type BookmarksFile = z.infer<typeof BookmarksFileSchema>
 export type HighlightsFile = z.infer<typeof HighlightsFileSchema>
+export type ArchiveFile = z.infer<typeof ArchiveFileSchema>

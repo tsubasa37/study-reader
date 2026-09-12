@@ -8,14 +8,14 @@ import {
   MoveDocumentSchema,
   NewBookmarkSchema,
   NewHighlightSchema,
-  RecordsMoveSchema,
 } from '../shared/schemas'
-import type { DocumentList } from '../shared/types'
+import type { DocumentEntry, DocumentList } from '../shared/types'
 import { bodyLimit } from 'hono/body-limit'
 import { HttpError } from './errors'
 import { moveDocument } from './documentMover'
 import { VAULT_CSP, decodePathname, isFile, sendFile } from './files'
 import { guard } from './guard'
+import { reconcileRecords } from './reconcile'
 import { createStudyRepository } from './studyRepository'
 import { realVaultPath, resolveVaultPath, scanDocuments } from './vault'
 
@@ -65,11 +65,21 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
   app.use('*', guard)
   app.use('/api/*', bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: '送られた内容が大きすぎます' }, 413) }))
 
+  // フォルダの中身を見て、記録の名札を実態に合わせてから返す
+  async function currentDocuments(): Promise<DocumentEntry[]> {
+    const documents = await scanDocuments(vaultDir)
+    await reconcileRecords(repository, documents)
+    return documents
+  }
+
   app.get('/api/documents', async (c) => {
-    const list: DocumentList = { vaultName: basename(vaultDir), documents: await scanDocuments(vaultDir) }
+    const list: DocumentList = { vaultName: basename(vaultDir), documents: await currentDocuments() }
     return c.json(list)
   })
-  app.get('/api/state', async (c) => c.json(await repository.state()))
+  app.get('/api/state', async (c) => {
+    await currentDocuments()
+    return c.json(await repository.state())
+  })
   app.post('/api/documents/move', async (c) =>
     c.json(await moveDocument(vaultDir, repository, MoveDocumentSchema.parse(await readJson(c)))),
   )
@@ -103,19 +113,6 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
   app.delete('/api/highlights/:id', async (c) => {
     await repository.highlights.remove(c.req.param('id'))
     return c.body(null, 204)
-  })
-
-  app.post('/api/records/move', async (c) => {
-    const move = RecordsMoveSchema.parse(await readJson(c))
-    if (!(await documentExists(vaultDir, move.to))) {
-      throw new HttpError(400, `引き継ぎ先の資料がありません: ${move.to}`)
-    }
-    return c.json(await repository.moveRecords(move))
-  })
-  app.delete('/api/records', async (c) => {
-    const path = c.req.query('path')
-    if (path === undefined || path === '') throw new HttpError(400, '記録を消す資料の path を指定してください')
-    return c.json(await repository.deleteRecords(path))
   })
 
   app.get('/vault/*', async (c) =>

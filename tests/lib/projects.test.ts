@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupIntoProjects, projectFolderOf, suggestMoveTarget } from '../../src/lib/projects'
+import { groupIntoProjects, projectFolderOf } from '../../src/lib/projects'
 import type { Bookmark, DocumentEntry, DocumentProgress, Highlight } from '../../shared/types'
 
 const document = (path: string): DocumentEntry => ({
@@ -110,18 +110,3 @@ describe('groupIntoProjects', () => {
   })
 })
 
-describe('suggestMoveTarget', () => {
-  it('同じファイル名が1つだけあれば、それを引き継ぎ先の候補にする', () => {
-    expect(suggestMoveTarget('Ansible.html', documents)).toBe('インフラ/Ansible.html')
-  })
-
-  it('同じ名前が複数あるときは候補を出さない（推測しない）', () => {
-    const withDuplicate = [...documents, document('別/Ansible.html')]
-
-    expect(suggestMoveTarget('Ansible.html', withDuplicate)).toBeNull()
-  })
-
-  it('同じ名前が無ければ候補を出さない', () => {
-    expect(suggestMoveTarget('消えた資料.html', documents)).toBeNull()
-  })
-})
