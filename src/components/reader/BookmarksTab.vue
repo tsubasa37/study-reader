@@ -2,6 +2,7 @@
 import { Trash2 } from '@lucide/vue'
 import type { Bookmark } from '../../../shared/types'
 import { formatWhen } from '../../lib/format'
+import { NO_EXCERPT, NO_SECTION } from '../../lib/labels'
 import NoteEditor from '../common/NoteEditor.vue'
 
 defineProps<{ items: Bookmark[]; activeId: string | null; editId: string | null }>()
@@ -13,8 +14,8 @@ const emit = defineEmits<{ go: [id: string]; saveMemo: [id: string, memo: string
   <ul v-else class="note-list">
     <li v-for="item in items" :key="item.id" class="note-item" :class="{ active: item.id === activeId }">
       <button class="note-go" type="button" @click="emit('go', item.id)">
-        <span class="note-where">{{ item.sectionTitle ?? '章の区切りなし' }}</span>
-        <span class="excerpt">{{ item.excerpt || '（本文の抜き出しなし）' }}</span>
+        <span class="note-where">{{ item.sectionTitle ?? NO_SECTION }}</span>
+        <span class="excerpt">{{ item.excerpt || NO_EXCERPT }}</span>
       </button>
       <NoteEditor
         :memo="item.memo"

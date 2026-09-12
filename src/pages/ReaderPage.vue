@@ -13,7 +13,7 @@ import { vaultUrl } from '../lib/api'
 const props = defineProps<{ path: string; bookmarkId: string | null; highlightId: string | null }>()
 
 const reader = useReaderPage(props)
-const { store, frame, highlights, document, panelOpen, panelTab } = reader
+const { store, frame, highlights, entry, panelOpen, panelTab } = reader
 
 function removeBookmark(id: string): void {
   if (window.confirm('このしおりを外しますか？')) void store.deleteBookmark(id)
@@ -27,7 +27,7 @@ function removeHighlight(id: string): void {
 <template>
   <div class="reader">
     <ReaderBar
-      :title="document?.name ?? path"
+      :title="entry?.name ?? path"
       :section-title="frame.currentSection.value?.title ?? null"
       :panel-open="panelOpen"
       :doc-nav-hidden="reader.docNavHidden.value"
@@ -36,13 +36,13 @@ function removeHighlight(id: string): void {
       @toggle-doc-nav="reader.toggleDocNav"
       @toggle-panel="panelOpen = !panelOpen"
     />
-    <p v-if="store.state.loaded && document === null" class="missing">
+    <p v-if="store.state.loaded && entry === null" class="missing">
       この資料は資料フォルダにありません: {{ path }}
       <RouterLink to="/">本棚へ戻る</RouterLink>
     </p>
     <div v-else class="stage">
       <div class="frame-wrap">
-        <iframe :src="vaultUrl(path)" :title="document?.name ?? path" @load="reader.onFrameLoad" />
+        <iframe :src="vaultUrl(path)" :title="entry?.name ?? path" @load="reader.onFrameLoad" />
         <DocNavHandle
           v-if="reader.docNavHandle.value !== null"
           :x="reader.docNavHandle.value.x"

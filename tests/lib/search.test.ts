@@ -25,9 +25,22 @@ describe('searchDocuments', () => {
     expect(hits[1]?.after.startsWith(' の union 型。')).toBe(true)
   })
 
-  it('見つけた位置は、閲覧画面で同じ文章として探し直せる', () => {
-    for (const hit of searchDocuments([indexed], 'type')) {
-      expect(locateQuote(indexed.text, hit.quote)?.start).toBe(hit.quote.start)
+  it('見つけた文章は、教材の前に段落が増えても探し直せる（閲覧画面で開いたときと同じ手順）', () => {
+    const revised = indexDocument(
+      'TypeScript基礎教科書.html',
+      'TypeScript基礎教科書',
+      parseHtml(`
+        <p>あとから足した前書きです。</p>
+        <section id="t-objects"><h2>04 オブジェクト・type・interface</h2><p>ＴｙｐｅＳｃｒｉｐｔ では Type を使う。</p></section>
+        <section id="t-union"><h2>06 union</h2><p>typescript の union 型。</p></section>
+      `),
+    )
+
+    for (const hit of searchDocuments([indexed], 'typescript')) {
+      const span = locateQuote(revised.text, hit.quote)
+      if (span === null) throw new Error(`探し直せませんでした: ${hit.quote.exact}`)
+      expect(revised.text.slice(span.start, span.end)).toBe(hit.quote.exact)
+      expect(span.start).not.toBe(hit.quote.start)
     }
   })
 

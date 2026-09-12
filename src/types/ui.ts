@@ -61,16 +61,16 @@ export type NoteEntry = {
   memo: string
   color: HighlightColor | null
   createdAt: string
-  lost: boolean
 }
+
+// 一覧では「位置を見失ったか」を、検索結果では資料名を添える
+export type NoteListEntry = NoteEntry & { lost: boolean }
+export type NoteHit = NoteEntry & { name: string }
 
 export type NoteGroup = {
   path: string
   name: string
   missing: boolean
-  entries: NoteEntry[]
+  entries: NoteListEntry[]
 }
 
-export type NoteHit =
-  | { kind: 'bookmark'; id: string; path: string; name: string; sectionTitle: string | null; text: string; memo: string }
-  | { kind: 'highlight'; id: string; path: string; name: string; sectionTitle: string | null; text: string; memo: string; color: HighlightColor }

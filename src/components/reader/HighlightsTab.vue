@@ -2,6 +2,7 @@
 import { CircleAlert, Trash2 } from '@lucide/vue'
 import type { Highlight, HighlightColor } from '../../../shared/types'
 import { formatWhen } from '../../lib/format'
+import { NO_SECTION } from '../../lib/labels'
 import ColorPicker from '../common/ColorPicker.vue'
 import HighlightQuote from '../common/HighlightQuote.vue'
 import NoteEditor from '../common/NoteEditor.vue'
@@ -20,7 +21,7 @@ const emit = defineEmits<{
   <ul v-if="items.length > 0" class="note-list">
     <li v-for="item in items" :key="item.id" class="note-item" :class="{ active: item.id === activeId }">
       <button class="note-go" type="button" @click="emit('go', item.id)">
-        <span class="note-where">{{ item.sectionTitle ?? '章の区切りなし' }}</span>
+        <span class="note-where">{{ item.sectionTitle ?? NO_SECTION }}</span>
         <HighlightQuote :text="item.quote.exact" :color="item.color" />
       </button>
       <ColorPicker v-if="item.id === activeId" :value="item.color" @change="(color) => emit('recolor', item.id, color)" />
@@ -41,7 +42,7 @@ const emit = defineEmits<{
     <p>教材が書き換えられ、この文章が見つかりませんでした。記録は残してあります。</p>
     <ul class="note-list">
       <li v-for="item in lost" :key="item.id" class="note-item">
-        <span class="note-where">{{ item.sectionTitle ?? '章の区切りなし' }}</span>
+        <span class="note-where">{{ item.sectionTitle ?? NO_SECTION }}</span>
         <HighlightQuote :text="item.quote.exact" :color="item.color" />
         <span v-if="item.memo" class="lost-memo">{{ item.memo }}</span>
         <div class="note-meta">

@@ -27,7 +27,7 @@ const textIndex = (index: number) => props.noteHits.length + index
         <Bookmark v-else :size="12" />
         {{ hit.name }}<template v-if="hit.sectionTitle"> ・ {{ hit.sectionTitle }}</template>
       </span>
-      <HighlightQuote v-if="hit.kind === 'highlight'" :text="hit.text" :color="hit.color" />
+      <HighlightQuote v-if="hit.kind === 'highlight' && hit.color" :text="hit.text" :color="hit.color" />
       <span v-else class="snippet">{{ hit.text }}</span>
       <span v-if="hit.memo" class="memo">{{ hit.memo }}</span>
     </button>

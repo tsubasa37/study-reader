@@ -3,10 +3,11 @@ import { Bookmark, CircleAlert, Highlighter } from '@lucide/vue'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { formatWhen } from '../../lib/format'
-import type { NoteEntry } from '../../types/ui'
+import { NO_EXCERPT, NO_SECTION } from '../../lib/labels'
+import type { NoteListEntry } from '../../types/ui'
 import HighlightQuote from '../common/HighlightQuote.vue'
 
-const props = defineProps<{ entry: NoteEntry; openable: boolean }>()
+const props = defineProps<{ entry: NoteListEntry; openable: boolean }>()
 
 const target = computed(() => ({ name: 'read', query: { path: props.entry.path, [props.entry.kind]: props.entry.id } }))
 </script>
@@ -17,10 +18,10 @@ const target = computed(() => ({ name: 'read', query: { path: props.entry.path, 
       <span class="note-where">
         <Highlighter v-if="entry.kind === 'highlight'" :size="12" />
         <Bookmark v-else :size="12" />
-        {{ entry.sectionTitle ?? '章の区切りなし' }}
+        {{ entry.sectionTitle ?? NO_SECTION }}
       </span>
       <HighlightQuote v-if="entry.kind === 'highlight' && entry.color" :text="entry.text" :color="entry.color" />
-      <span v-else class="excerpt">{{ entry.text || '（本文の抜き出しなし）' }}</span>
+      <span v-else class="excerpt">{{ entry.text || NO_EXCERPT }}</span>
     </component>
     <p v-if="entry.memo" class="memo">{{ entry.memo }}</p>
     <div class="note-meta">

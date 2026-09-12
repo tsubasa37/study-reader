@@ -58,7 +58,7 @@ export function useReaderPage(props: ReaderProps) {
   const editRequestId = ref<string | null>(null)
   let detachInteractions: (() => void) | null = null
 
-  const document = computed(() => store.documentsByPath.value.get(props.path) ?? null)
+  const entry = computed(() => store.documentsByPath.value.get(props.path) ?? null)
   const bookmarks = computed(() =>
     store.state.bookmarks
       .filter((item) => item.path === props.path)
@@ -164,7 +164,7 @@ export function useReaderPage(props: ReaderProps) {
       return
     }
     await loadStudyState()
-    if (document.value === null) return
+    if (entry.value === null) return
     const opened = await frame.open(win, doc)
     if (opened === null) return
     refreshDocNavMetrics()
@@ -280,7 +280,7 @@ export function useReaderPage(props: ReaderProps) {
     search,
     frame,
     highlights,
-    document,
+    entry,
     bookmarks,
     toc,
     leafCount,

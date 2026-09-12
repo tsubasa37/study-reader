@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { DocumentEntry, DocumentProgress } from '../../../shared/types'
 import { formatWhen } from '../../lib/format'
+import { NO_SECTION } from '../../lib/labels'
 import { summarizeProgress } from '../../lib/progressSummary'
 
 const props = defineProps<{ document: DocumentEntry; progress: DocumentProgress }>()
@@ -14,7 +15,7 @@ const summary = computed(() => summarizeProgress(props.progress))
     <span class="ribbon" aria-hidden="true" />
     <span class="label">前回の続き</span>
     <strong class="title">{{ document.name }}</strong>
-    <span class="where">{{ progress.sectionTitle ?? '章の区切りなし' }}</span>
+    <span class="where">{{ progress.sectionTitle ?? NO_SECTION }}</span>
     <span class="meta num">{{ formatWhen(progress.lastOpenedAt) }} ・ {{ summary.label }}</span>
     <span class="btn btn-primary">続きから読む</span>
   </RouterLink>

@@ -42,11 +42,11 @@ describe('JsonStore', () => {
     await expect(store.read()).rejects.toThrow('想定と違います')
   })
 
-  it('同時に来た更新を取りこぼさず順に反映する', async () => {
+  it('同時に来た更新を、頼んだ順のまま取りこぼさず反映する', async () => {
     await Promise.all(Array.from({ length: 20 }, (_, index) => append(index)))
 
     const { items } = await store.read()
-    expect([...items].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, index) => index))
+    expect(items).toEqual(Array.from({ length: 20 }, (_, index) => index))
   })
 
   it('途中の更新が失敗しても、失敗はその呼び出しに返り、後の更新は反映される', async () => {

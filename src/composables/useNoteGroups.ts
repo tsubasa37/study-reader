@@ -2,7 +2,8 @@ import { computed, type Ref } from 'vue'
 import { locateQuote } from '../lib/anchoring'
 import type { IndexedDocument } from '../lib/search'
 import { matchesText } from '../lib/search'
-import type { NoteEntry, NoteGroup } from '../types/ui'
+import { toNotes } from '../lib/notes'
+import type { NoteGroup, NoteListEntry } from '../types/ui'
 import { useStudyStore } from './useStudyStore'
 
 export type NoteFilter = {
@@ -15,34 +16,15 @@ export type NoteFilter = {
 export function useNoteGroups(filter: Ref<NoteFilter>, indexed: Ref<IndexedDocument[]>) {
   const store = useStudyStore()
 
-  const entries = computed<NoteEntry[]>(() => {
+  const entries = computed<NoteListEntry[]>(() => {
     const texts = new Map(indexed.value.map((document) => [document.path, document.text]))
-    const bookmarks: NoteEntry[] = store.state.bookmarks.map((item) => ({
-      kind: 'bookmark',
-      id: item.id,
-      path: item.path,
-      sectionTitle: item.sectionTitle,
-      text: item.excerpt,
-      memo: item.memo,
-      color: null,
-      createdAt: item.createdAt,
-      lost: false,
-    }))
-    const highlights: NoteEntry[] = store.state.highlights.map((item) => {
-      const text = texts.get(item.path)
-      return {
-        kind: 'highlight',
-        id: item.id,
-        path: item.path,
-        sectionTitle: item.sectionTitle,
-        text: item.quote.exact,
-        memo: item.memo,
-        color: item.color,
-        createdAt: item.createdAt,
-        lost: text !== undefined && locateQuote(text, item.quote) === null,
-      }
+    const quoteOf = new Map(store.state.highlights.map((item) => [item.id, item]))
+    return toNotes(store.state.bookmarks, store.state.highlights).map((note) => {
+      const highlight = note.kind === 'highlight' ? quoteOf.get(note.id) : undefined
+      const text = highlight === undefined ? undefined : texts.get(highlight.path)
+      // 本文を読み込めている資料だけ、ハイライトが見つかるかを見る
+      return { ...note, lost: highlight !== undefined && text !== undefined && locateQuote(text, highlight.quote) === null }
     })
-    return [...highlights, ...bookmarks]
   })
 
   const groups = computed<NoteGroup[]>(() => {
@@ -54,7 +36,7 @@ export function useNoteGroups(filter: Ref<NoteFilter>, indexed: Ref<IndexedDocum
         (text.trim() === '' || matchesText([entry.text, entry.memo, entry.sectionTitle ?? ''], text)),
     )
     const order = new Map(store.state.documents.map((document, index) => [document.path, index]))
-    const byPath = new Map<string, NoteEntry[]>()
+    const byPath = new Map<string, NoteListEntry[]>()
     for (const entry of visible) byPath.set(entry.path, [...(byPath.get(entry.path) ?? []), entry])
     return [...byPath.entries()]
       .map(([groupPath, groupEntries]) => ({
