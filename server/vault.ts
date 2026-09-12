@@ -1,8 +1,8 @@
 import type { Dirent } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, join, posix, relative, resolve, sep } from 'node:path'
 import type { DocumentEntry } from '../shared/types'
-import { HttpError } from './errors'
+import { HttpError, hasErrorCode } from './errors'
 
 export const STATE_DIR_NAME = '.study'
 
@@ -51,6 +51,39 @@ export function resolveProjectFolder(vaultDir: string, folder: string): string {
   const fullPath = resolve(vaultDir, folder)
   if (!fullPath.startsWith(vaultDir + sep)) throw new HttpError(400, `資料フォルダの外には作れません: ${folder}`)
   return fullPath
+}
+
+// リンクをたどった先まで見て、本当に資料フォルダの中かを確かめる
+export async function realVaultPath(vaultDir: string, relativePath: string): Promise<string> {
+  const fullPath = resolveVaultPath(vaultDir, relativePath)
+  let real: string
+  try {
+    real = await realpath(fullPath)
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) throw new HttpError(404, `ファイルがありません: ${relativePath}`)
+    throw error
+  }
+  if (!real.startsWith(vaultDir + sep)) {
+    throw new HttpError(400, `資料フォルダの外は開けません: ${relativePath}`)
+  }
+  return real
+}
+
+// 移動先のプロジェクトも実体で確かめる。まだ無いフォルダはこれから作るので、そのまま返す
+export async function realProjectFolder(vaultDir: string, folder: string): Promise<string> {
+  const fullPath = resolveProjectFolder(vaultDir, folder)
+  if (folder === '') return fullPath
+  let real: string
+  try {
+    real = await realpath(fullPath)
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return fullPath
+    throw error
+  }
+  if (!real.startsWith(vaultDir + sep)) {
+    throw new HttpError(400, `プロジェクトの場所が資料フォルダの外を指しています: ${folder}`)
+  }
+  return real
 }
 
 export function resolveVaultPath(vaultDir: string, relativePath: string): string {

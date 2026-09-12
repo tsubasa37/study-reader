@@ -32,7 +32,7 @@ describe('JsonStore', () => {
     await append(1)
     await writeFile(file, '{broken', 'utf8')
 
-    await expect(store.read()).rejects.toThrow(file)
+    await expect(store.read()).rejects.toThrow('.study/numbers.json')
   })
 
   it('形が想定と違えば失敗する', async () => {

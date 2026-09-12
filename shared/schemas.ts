@@ -17,8 +17,8 @@ export const DocumentProgressSchema = z.object({
   lastOpenedAt: timestamp,
   position: ReadingPositionSchema,
   sectionTitle: z.string().nullable(),
-  readSectionIds: z.array(z.string().min(1)),
-  sectionCount: z.number().int().min(0),
+  readSectionIds: z.array(z.string().min(1).max(200)).max(5000),
+  sectionCount: z.number().int().min(0).max(10000),
 })
 
 export const TextQuoteSchema = z.object({

@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { basename, dirname } from 'node:path'
 import type { z } from 'zod'
 import { hasErrorCode } from './errors'
 
@@ -7,12 +8,16 @@ export type StoreChange<T, R> = (current: T) => { next: T; result: R }
 
 export class JsonStore<T> {
   private queue: Promise<unknown> = Promise.resolve()
+  // 画面やログに出す名前。利用者のフォルダ構成をそのまま見せない
+  private readonly label: string
 
   constructor(
     private readonly file: string,
     private readonly schema: z.ZodType<T>,
     private readonly initial: () => T,
-  ) {}
+  ) {
+    this.label = `.study/${basename(file)}`
+  }
 
   async read(): Promise<T> {
     let text: string
@@ -26,11 +31,13 @@ export class JsonStore<T> {
     try {
       data = JSON.parse(text)
     } catch (error) {
-      throw new Error(`${this.file} を JSON として読めません（${(error as Error).message}）。中身を直すか、別名に移してから開き直してください`)
+      throw new Error(
+        `${this.label} を JSON として読めません（${(error as Error).message}）。中身を直すか、別名に移してから開き直してください`,
+      )
     }
     const parsed = this.schema.safeParse(data)
     if (!parsed.success) {
-      throw new Error(`${this.file} の中身が想定と違います: ${parsed.error.message}`)
+      throw new Error(`${this.label} の中身が想定と違います: ${parsed.error.message}`)
     }
     return parsed.data
   }
@@ -48,7 +55,7 @@ export class JsonStore<T> {
 
   private async write(data: T): Promise<void> {
     await mkdir(dirname(this.file), { recursive: true })
-    const temporary = `${this.file}.${process.pid}.${Date.now()}.tmp`
+    const temporary = `${this.file}.${randomUUID()}.tmp`
     await writeFile(temporary, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
     await rename(temporary, this.file)
   }

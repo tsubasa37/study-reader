@@ -1,4 +1,5 @@
-import { readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -31,6 +32,37 @@ function send(method: string, path: string, body?: unknown): Promise<Response> {
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
   )
+}
+
+// 消えた資料の記録は API からは作れないので、記録ファイルを直接置いて用意する
+async function seedRecords(
+  path: string,
+  options: { progress?: Partial<DocumentProgress>; bookmarks?: number; highlights?: number } = {},
+): Promise<void> {
+  const dir = join(vault.dir, '.study')
+  await mkdir(dir, { recursive: true })
+  const current = await state()
+  const at = '2026-09-11T04:06:00.000Z'
+  const documents = { ...current.progress, [path]: progress({ path, ...options.progress }) }
+  await writeFile(join(dir, 'progress.json'), JSON.stringify({ version: 1, documents }, null, 2), 'utf8')
+  if (options.bookmarks !== undefined) {
+    const items = Array.from({ length: options.bookmarks }, (_, index) => ({
+      ...bookmark(path),
+      id: `seed-bookmark-${index}`,
+      createdAt: at,
+      updatedAt: at,
+    }))
+    await writeFile(join(dir, 'bookmarks.json'), JSON.stringify({ version: 1, items }, null, 2), 'utf8')
+  }
+  if (options.highlights !== undefined) {
+    const items = Array.from({ length: options.highlights }, (_, index) => ({
+      ...highlight(path),
+      id: `seed-highlight-${index}`,
+      createdAt: at,
+      updatedAt: at,
+    }))
+    await writeFile(join(dir, 'highlights.json'), JSON.stringify({ version: 1, items }, null, 2), 'utf8')
+  }
 }
 
 async function state(): Promise<StudyState> {
@@ -165,9 +197,7 @@ describe('ハイライト', () => {
 
 describe('記録の引き継ぎ', () => {
   it('無くなったファイルの記録を、別の資料へまとめて移す', async () => {
-    await send('PUT', '/api/progress', progress({ path: 'old.html' }))
-    await send('POST', '/api/bookmarks', bookmark('old.html'))
-    await send('POST', '/api/highlights', highlight('old.html'))
+    await seedRecords('old.html', { bookmarks: 1, highlights: 1 })
 
     const response = await send('POST', '/api/records/move', { from: 'old.html', to: DOC })
 
@@ -180,16 +210,13 @@ describe('記録の引き継ぎ', () => {
   })
 
   it('引き継ぎ先にも進み具合があれば、新しい方の位置を残し既読の章を合わせる', async () => {
-    await send(
-      'PUT',
-      '/api/progress',
-      progress({
-        path: 'old.html',
+    await seedRecords('old.html', {
+      progress: {
         lastOpenedAt: '2026-09-10T00:00:00.000Z',
         readSectionIds: ['a'],
         position: { sectionId: 'a', sectionOffset: 0, scrollRatio: 0 },
-      }),
-    )
+      },
+    })
     await send(
       'PUT',
       '/api/progress',
@@ -204,7 +231,7 @@ describe('記録の引き継ぎ', () => {
   })
 
   it('引き継ぎ先の資料が無ければ 400', async () => {
-    await send('PUT', '/api/progress', progress({ path: 'old.html' }))
+    await seedRecords('old.html')
 
     expect((await send('POST', '/api/records/move', { from: 'old.html', to: 'missing.html' })).status).toBe(400)
   })
@@ -214,8 +241,7 @@ describe('記録の引き継ぎ', () => {
   })
 
   it('記録を削除できる', async () => {
-    await send('PUT', '/api/progress', progress({ path: 'old.html' }))
-    await send('POST', '/api/bookmarks', bookmark('old.html'))
+    await seedRecords('old.html', { bookmarks: 1 })
 
     const response = await send('DELETE', `/api/records?path=${encodeURIComponent('old.html')}`)
 
@@ -287,5 +313,146 @@ describe('資料の移動', () => {
 
   it('すでに同じ場所にあるなら 400', async () => {
     expect((await moveTo('')).status).toBe(400)
+  })
+})
+
+describe('入口の門（外部サイトからの操作を断つ）', () => {
+  it('別のドメインを装った呼び出しは 403', async () => {
+    expect((await app.request('http://evil.example/api/state')).status).toBe(403)
+  })
+
+  it('外部サイトからの取得（Sec-Fetch-Site: cross-site）は 403', async () => {
+    const response = await app.request('/api/state', { headers: { 'Sec-Fetch-Site': 'cross-site' } })
+
+    expect(response.status).toBe(403)
+  })
+
+  it('外部サイトの Origin は 403', async () => {
+    const response = await app.request('/api/state', { headers: { Origin: 'https://evil.example' } })
+
+    expect(response.status).toBe(403)
+  })
+
+  it('text/plain で送られた書き込みは 415（事前確認を迂回させない）', async () => {
+    const response = await app.request('/api/documents/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({ path: DOC, folder: 'アプリ開発' }),
+    })
+
+    expect(response.status).toBe(415)
+    expect(await readdir(vault.dir)).toContain(DOC)
+  })
+
+  it('自分の画面からの操作（same-origin）は通る', async () => {
+    const response = await app.request('/api/state', {
+      headers: { 'Sec-Fetch-Site': 'same-origin', Origin: 'http://localhost' },
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('大きすぎる本文は 413', async () => {
+    const response = await send('PUT', '/api/progress', {
+      ...progress(),
+      readSectionIds: Array.from({ length: 5000 }, () => 'x'.repeat(200)),
+    })
+
+    expect(response.status).toBe(413)
+  })
+
+  it('章の数が多すぎる記録は 400', async () => {
+    const response = await send('PUT', '/api/progress', {
+      ...progress(),
+      readSectionIds: Array.from({ length: 5001 }, (_, index) => `ch${index}`),
+    })
+
+    expect(response.status).toBe(400)
+  })
+})
+
+describe('シンボリックリンク（資料フォルダの外へ出さない）', () => {
+  let outside: string
+
+  beforeEach(async () => {
+    outside = await mkdtemp(join(tmpdir(), 'study-reader-outside-'))
+    await writeFile(join(outside, 'secret.txt'), 'himitsu', 'utf8')
+  })
+
+  afterEach(() => rm(outside, { recursive: true, force: true }))
+
+  it('外を指すリンクは配信しない', async () => {
+    await symlink(join(outside, 'secret.txt'), join(vault.dir, 'リンク.html'))
+
+    const response = await send('GET', `/vault/${encodeURIComponent('リンク.html')}`)
+
+    expect(response.status).toBe(400)
+    expect(await response.text()).not.toContain('himitsu')
+  })
+
+  it('移動先が外を指すリンクなら移動しない', async () => {
+    await symlink(outside, join(vault.dir, 'そとリンク'))
+
+    const response = await send('POST', '/api/documents/move', { path: DOC, folder: 'そとリンク' })
+
+    expect(response.status).toBe(400)
+    expect(await readdir(vault.dir)).toContain(DOC)
+    expect(await readdir(outside)).toEqual(['secret.txt'])
+  })
+})
+
+describe('資料の移動（壊さない）', () => {
+  it('移動先に同じ名前のフォルダがあれば 409 で1つも動かさない', async () => {
+    await mkdir(join(vault.dir, 'アプリ開発', 'TypeScript基礎教科書.pdf'), { recursive: true })
+
+    const response = await send('POST', '/api/documents/move', { path: DOC, folder: 'アプリ開発' })
+
+    expect(response.status).toBe(409)
+    expect(await readdir(vault.dir)).toContain(DOC)
+    expect(await readdir(join(vault.dir, 'アプリ開発'))).toEqual(['TypeScript基礎教科書.pdf'])
+  })
+
+  it('拡張子の無い同じ名前のファイルは巻き込まない', async () => {
+    await writeFile(join(vault.dir, 'TypeScript基礎教科書'), 'メモ', 'utf8')
+
+    const response = await send('POST', '/api/documents/move', { path: DOC, folder: 'アプリ開発' })
+
+    expect(((await response.json()) as { movedFiles: string[] }).movedFiles).toEqual([
+      'アプリ開発/TypeScript基礎教科書.html',
+      'アプリ開発/TypeScript基礎教科書.pdf',
+    ])
+    expect(await readdir(vault.dir)).toContain('TypeScript基礎教科書')
+  })
+})
+
+describe('記録の宛先は実在する資料だけ', () => {
+  it('消えた資料への進み具合の保存は 404', async () => {
+    expect((await send('PUT', '/api/progress', progress({ path: '消えた.html' }))).status).toBe(404)
+  })
+
+  it('消えた資料へのしおり追加は 404', async () => {
+    expect((await send('POST', '/api/bookmarks', bookmark('消えた.html'))).status).toBe(404)
+  })
+})
+
+describe('教材の配信', () => {
+  it('教材には CSP と nosniff を付ける', async () => {
+    const response = await send('GET', `/vault/${encodeURIComponent(DOC)}`)
+
+    expect(response.headers.get('content-security-policy')).toContain("connect-src 'none'")
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response.headers.get('last-modified')).not.toBeNull()
+  })
+
+  it('更新されていなければ 304 を返す', async () => {
+    const first = await send('GET', `/vault/${encodeURIComponent(DOC)}`)
+    const lastModified = first.headers.get('last-modified') ?? ''
+
+    const second = await app.request(`/vault/${encodeURIComponent(DOC)}`, {
+      headers: { 'If-Modified-Since': lastModified },
+    })
+
+    expect(second.status).toBe(304)
+    expect(await second.text()).toBe('')
   })
 })

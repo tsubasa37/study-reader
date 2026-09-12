@@ -11,11 +11,31 @@ import {
   RecordsMoveSchema,
 } from '../shared/schemas'
 import type { DocumentList } from '../shared/types'
+import { bodyLimit } from 'hono/body-limit'
 import { HttpError } from './errors'
 import { moveDocument } from './documentMover'
-import { decodePathname, isFile, sendFile } from './files'
+import { VAULT_CSP, decodePathname, isFile, sendFile } from './files'
+import { guard } from './guard'
 import { createStudyRepository } from './studyRepository'
-import { resolveVaultPath, scanDocuments } from './vault'
+import { realVaultPath, resolveVaultPath, scanDocuments } from './vault'
+
+const MAX_BODY_BYTES = 1_000_000
+
+// 記録の宛先は実在する資料だけにする。消えた資料の記録で上書きしない
+async function documentExists(vaultDir: string, path: string): Promise<boolean> {
+  try {
+    return await isFile(await realVaultPath(vaultDir, path))
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) return false
+    throw error
+  }
+}
+
+async function assertDocument(vaultDir: string, path: string): Promise<void> {
+  if (!(await documentExists(vaultDir, path))) {
+    throw new HttpError(404, `資料が見つかりません: ${path}`)
+  }
+}
 
 export type AppOptions = {
   vaultDir: string
@@ -42,6 +62,9 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
   })
   app.notFound((c) => c.json({ error: `見つかりません: ${new URL(c.req.url).pathname}` }, 404))
 
+  app.use('*', guard)
+  app.use('/api/*', bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: '送られた内容が大きすぎます' }, 413) }))
+
   app.get('/api/documents', async (c) => {
     const list: DocumentList = { vaultName: basename(vaultDir), documents: await scanDocuments(vaultDir) }
     return c.json(list)
@@ -50,13 +73,17 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
   app.post('/api/documents/move', async (c) =>
     c.json(await moveDocument(vaultDir, repository, MoveDocumentSchema.parse(await readJson(c)))),
   )
-  app.put('/api/progress', async (c) =>
-    c.json(await repository.saveProgress(DocumentProgressSchema.parse(await readJson(c)))),
-  )
+  app.put('/api/progress', async (c) => {
+    const entry = DocumentProgressSchema.parse(await readJson(c))
+    await assertDocument(vaultDir, entry.path)
+    return c.json(await repository.saveProgress(entry))
+  })
 
-  app.post('/api/bookmarks', async (c) =>
-    c.json(await repository.bookmarks.add(NewBookmarkSchema.parse(await readJson(c))), 201),
-  )
+  app.post('/api/bookmarks', async (c) => {
+    const input = NewBookmarkSchema.parse(await readJson(c))
+    await assertDocument(vaultDir, input.path)
+    return c.json(await repository.bookmarks.add(input), 201)
+  })
   app.patch('/api/bookmarks/:id', async (c) =>
     c.json(await repository.bookmarks.update(c.req.param('id'), BookmarkPatchSchema.parse(await readJson(c)))),
   )
@@ -65,9 +92,11 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
     return c.body(null, 204)
   })
 
-  app.post('/api/highlights', async (c) =>
-    c.json(await repository.highlights.add(NewHighlightSchema.parse(await readJson(c))), 201),
-  )
+  app.post('/api/highlights', async (c) => {
+    const input = NewHighlightSchema.parse(await readJson(c))
+    await assertDocument(vaultDir, input.path)
+    return c.json(await repository.highlights.add(input), 201)
+  })
   app.patch('/api/highlights/:id', async (c) =>
     c.json(await repository.highlights.update(c.req.param('id'), HighlightPatchSchema.parse(await readJson(c)))),
   )
@@ -78,8 +107,7 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
 
   app.post('/api/records/move', async (c) => {
     const move = RecordsMoveSchema.parse(await readJson(c))
-    const documents = await scanDocuments(vaultDir)
-    if (!documents.some((document) => document.path === move.to)) {
+    if (!(await documentExists(vaultDir, move.to))) {
       throw new HttpError(400, `引き継ぎ先の資料がありません: ${move.to}`)
     }
     return c.json(await repository.moveRecords(move))
@@ -90,7 +118,9 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
     return c.json(await repository.deleteRecords(path))
   })
 
-  app.get('/vault/*', async (c) => sendFile(c, resolveVaultPath(vaultDir, decodePathname(c.req.url, '/vault/'))))
+  app.get('/vault/*', async (c) =>
+    sendFile(c, await realVaultPath(vaultDir, decodePathname(c.req.url, '/vault/')), { csp: VAULT_CSP }),
+  )
 
   if (clientDir !== null) {
     app.get('*', async (c) => {
