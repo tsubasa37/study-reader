@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { CircleAlert } from '@lucide/vue'
 import { computed, reactive } from 'vue'
 import type { DocumentEntry } from '../../../shared/types'
 import { notify } from '../../composables/useNotices'
@@ -38,9 +37,11 @@ async function discard(record: OrphanRecord): Promise<void> {
 </script>
 
 <template>
-  <section class="orphans" aria-labelledby="orphans-title">
-    <h2 id="orphans-title"><CircleAlert :size="15" />ファイルが見つからない記録</h2>
-    <p class="explain">名前を変えたり移動したりした資料の記録です。今のファイルを選ぶと、しおり・ハイライト・進み具合を引き継げます。</p>
+  <details class="orphans">
+    <summary>記録だけ残っている資料 <span class="num">{{ records.length }}</span></summary>
+    <p class="explain">
+      名前を変えた・移動した・消した資料の記録です。そのままにしておいても問題ありません。今のファイルに結び付け直すことも、記録を消すこともできます。
+    </p>
     <ul>
       <li v-for="record in records" :key="record.path">
         <div class="what">
@@ -65,26 +66,29 @@ async function discard(record: OrphanRecord): Promise<void> {
         <button class="btn btn-ghost btn-danger" type="button" @click="discard(record)">記録を消す</button>
       </li>
     </ul>
-  </section>
+  </details>
 </template>
 
 <style scoped>
 .orphans {
-  display: grid;
-  gap: 10px;
-  padding: 18px 20px;
-  border: 1px solid color-mix(in srgb, var(--warn-ink) 30%, transparent);
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
   border-radius: 10px;
-  background: var(--warn-soft);
+  background: var(--paper);
 }
 
-h2 {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 0;
-  color: var(--warn-ink);
-  font-size: 14px;
+summary {
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+summary .num {
+  color: var(--ink-3);
+}
+
+.orphans[open] summary {
+  margin-bottom: 10px;
 }
 
 .explain {
@@ -96,6 +100,7 @@ h2 {
 ul {
   display: grid;
   gap: 10px;
+  margin-top: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -120,7 +125,7 @@ li {
 }
 
 .hint {
-  color: var(--warn-ink);
+  color: var(--ink-3);
   font-size: 11.5px;
 }
 
