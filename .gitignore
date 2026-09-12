@@ -1,0 +1,5 @@
+node_modules/
+dist/
+study-reader.config.json
+*.tmp
+.DS_Store

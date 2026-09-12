@@ -1,0 +1,42 @@
+:root {
+  --desk: #eceef2;
+  --paper: #fafbfc;
+  --sheet: #ffffff;
+  --ink: #1b2130;
+  --ink-2: #566074;
+  --ink-3: #8a93a3;
+  --rule: #d6dbe3;
+  --ribbon: #2e4c8f;
+  --ribbon-ink: #ffffff;
+  --ribbon-soft: #e2e8f5;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn-ink: #8a3b00;
+  --warn-soft: #fff1e2;
+  --shadow: 0 1px 2px rgba(27, 33, 48, 0.06), 0 10px 28px rgba(27, 33, 48, 0.1);
+  --f-display: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', serif;
+  --f-ui: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', system-ui, sans-serif;
+  --f-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #111419;
+    --paper: #191d25;
+    --sheet: #1f242d;
+    --ink: #e4e7ed;
+    --ink-2: #a0a8b7;
+    --ink-3: #6f7888;
+    --rule: #2b313c;
+    --ribbon: #93abec;
+    --ribbon-ink: #0f1522;
+    --ribbon-soft: #232e4a;
+    --danger: #ff8a80;
+    --danger-soft: #3a1f1f;
+    --warn-ink: #ffc58f;
+    --warn-soft: #3a2a1a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}

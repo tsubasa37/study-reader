@@ -1,0 +1,36 @@
+{
+  "name": "study-reader",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "勉強資料フォルダの HTML 教材を、前回の続きから読むためのローカル Web アプリ",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,green \"tsx watch server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "vite build && tsx server/index.ts --serve-client",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@lucide/vue": "^1.45.0",
+    "hono": "^4.13.7",
+    "vue": "^3.5.42",
+    "vue-router": "^4.6.4",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "concurrently": "^10.0.5",
+    "jsdom": "^29.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0",
+    "vue-tsc": "^3.3.11"
+  }
+}
