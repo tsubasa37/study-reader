@@ -55,6 +55,23 @@ describe('locateQuote', () => {
     expect(indexesToRange(afterMap, span.start, span.end, after).toString()).toBe('上書き')
   })
 
+  it('同じ文章が複数あって前後がどれも違うときは、見失ったものとして扱う', () => {
+    const text = 'まったく別の話。ポイントという語だけ残った。さらに違う話。ポイントはここにもある。'
+
+    expect(
+      locateQuote(text, { exact: 'ポイント', prefix: '教材の元の前の文。', suffix: 'は大事です。', start: 0 }),
+    ).toBeNull()
+  })
+
+  it('候補が1つだけなら、前後が書き換わっていても見つける', () => {
+    const text = 'すっかり書き直した本文です。ポイントはここ。'
+
+    expect(locateQuote(text, { exact: 'ポイント', prefix: '前の文', suffix: '後ろの文', start: 200 })).toEqual({
+      start: text.indexOf('ポイント'),
+      end: text.indexOf('ポイント') + 4,
+    })
+  })
+
   it('文章が消えていれば null', () => {
     expect(locateQuote('書き換えた後の教材', { exact: '上書き', prefix: '', suffix: '', start: 0 })).toBeNull()
   })

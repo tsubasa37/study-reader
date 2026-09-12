@@ -12,7 +12,8 @@ import {
   saveDocNavWidth,
   type DocNavMetrics,
 } from '../lib/documentChrome'
-import { attachFrameInteractions, excerptAtTop } from '../lib/frameInteractions'
+import { vaultUrl } from '../lib/api'
+import { attachFrameInteractions, decodeVaultPath, excerptAtTop } from '../lib/frameInteractions'
 import { flashRange } from '../lib/highlightPainter'
 import { indexesToRange } from '../lib/textMap'
 import type { PanelTab, TocEntry } from '../types/ui'
@@ -69,7 +70,7 @@ export function useReaderPage(props: ReaderProps) {
       title: section.title,
       depth: section.depth,
       isLeaf: section.isLeaf,
-      read: frame.readSectionIds.value.includes(section.id),
+      read: frame.readInDocument.value.includes(section.id),
       current: frame.position.value?.sectionId === section.id,
     })),
   )
@@ -150,10 +151,22 @@ export function useReaderPage(props: ReaderProps) {
     const win = iframe.contentWindow
     const doc = iframe.contentDocument
     if (win === null || doc === null) throw new Error('教材を読み込めませんでした')
-    if (!doc.location.pathname.startsWith('/vault/')) return
+    const pathname = doc.location.pathname
+    if (!pathname.startsWith('/vault/')) return
+    // 教材ではない応答（見つからないときのエラーなど）を教材として扱わない
+    if (doc.contentType !== 'text/html') {
+      notify('教材を開けませんでした。資料が移動・改名された可能性があります')
+      return
+    }
+    // 別の教材へ移っていたら、その教材の画面に切り替える（古い資料の記録に書き込まない）
+    if (pathname !== vaultUrl(props.path)) {
+      void router.replace({ name: 'read', query: { path: decodeVaultPath(pathname) } })
+      return
+    }
     await loadStudyState()
     if (document.value === null) return
     const opened = await frame.open(win, doc)
+    if (opened === null) return
     refreshDocNavMetrics()
     detachInteractions?.()
     const detachHighlights = highlights.attach(opened, focusHighlight)

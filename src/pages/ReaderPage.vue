@@ -63,7 +63,7 @@ function removeHighlight(id: string): void {
         v-model:tab="panelTab"
         :bookmark-count="reader.bookmarks.value.length"
         :highlight-count="highlights.items.value.length"
-        :read-count="frame.readSectionIds.value.length"
+        :read-count="frame.readInDocument.value.length"
         :leaf-count="reader.leafCount.value"
       >
         <template #toc>

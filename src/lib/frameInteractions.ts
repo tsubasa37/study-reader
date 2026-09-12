@@ -31,8 +31,12 @@ export function attachFrameInteractions({ doc }: ReaderSession, handlers: FrameH
     if (sameOrigin && url.pathname === doc.location.pathname) return
     event.preventDefault()
     if (sameOrigin && url.pathname.startsWith('/vault/')) {
-      handlers.openDocument(decodeVaultPath(url.pathname))
-      return
+      const target = decodeVaultPath(url.pathname)
+      // 閲覧画面で開けるのは HTML の教材だけ。PDF などは別タブに回す
+      if (/\.html?$/i.test(target)) {
+        handlers.openDocument(target)
+        return
+      }
     }
     const opened = window.open(url.href, '_blank', 'noopener,noreferrer')
     if (opened === null) handlers.popupBlocked(url.href)

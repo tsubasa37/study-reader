@@ -2,6 +2,8 @@ import type { TextQuote } from '../../shared/types'
 import { boundaryToIndex, type TextMap } from './textMap'
 
 const CONTEXT_LENGTH = 32
+// 同じ文章が複数あるときに、前後がこれだけ一致しなければ「見失った」とする
+const MIN_CONTEXT_MATCH = 4
 
 export type TextSpan = { start: number; end: number }
 
@@ -42,7 +44,10 @@ function sharedPrefixLength(a: string, b: string): number {
 export function locateQuote(text: string, quote: TextQuote): TextSpan | null {
   let best: number | null = null
   let bestScore = Number.NEGATIVE_INFINITY
+  let bestContext = 0
+  let candidates = 0
   for (let index = text.indexOf(quote.exact); index !== -1; index = text.indexOf(quote.exact, index + 1)) {
+    candidates++
     const before = text.slice(Math.max(0, index - quote.prefix.length), index)
     const afterStart = index + quote.exact.length
     const after = text.slice(afterStart, afterStart + quote.suffix.length)
@@ -50,8 +55,13 @@ export function locateQuote(text: string, quote: TextQuote): TextSpan | null {
     const score = context - Math.abs(index - quote.start) / (text.length + 1)
     if (score > bestScore) {
       bestScore = score
+      bestContext = context
       best = index
     }
   }
-  return best === null ? null : { start: best, end: best + quote.exact.length }
+  if (best === null) return null
+  // 候補が1つだけなら前後が変わっていても採る。複数あるときは前後の一致で決める
+  const required = Math.min(quote.prefix.length + quote.suffix.length, MIN_CONTEXT_MATCH)
+  if (candidates > 1 && bestContext < required) return null
+  return { start: best, end: best + quote.exact.length }
 }

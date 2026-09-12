@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import type { DocumentProgress, ReadingPosition } from '../../shared/types'
+import { DwellTracker } from '../lib/dwell'
 import { finishedSectionIds, positionAt, scrollTopFor, type SectionBox } from '../lib/position'
 import { detectSections } from '../lib/sections'
 import { buildTextMap, type TextMap } from '../lib/textMap'
@@ -18,24 +19,21 @@ export function useReaderFrame(path: string) {
   const store = useStudyStore()
   const session = shallowRef<ReaderSession | null>(null)
   const position = ref<ReadingPosition | null>(null)
+  // 記録に残す既読（今の教材に無い章も保持する。教材の書き換えで既読を失わないため）
   const readSectionIds = ref<string[]>([])
+  let generation = 0
   let throttleTimer: ReturnType<typeof setTimeout> | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let programmaticUntil = 0
   let detach: (() => void) | null = null
   // 章ごとの滞在時間。通り過ぎただけの章を既読にしないために測る
-  let dwellMs = new Map<string, number>()
-  let dwellSectionId: string | null = null
-  let dwellSince = 0
+  const dwell = new DwellTracker()
 
-  function accumulateDwell(sectionId: string | null, now: number): Map<string, number> {
-    if (dwellSectionId !== null) {
-      dwellMs.set(dwellSectionId, (dwellMs.get(dwellSectionId) ?? 0) + (now - dwellSince))
-    }
-    dwellSectionId = sectionId
-    dwellSince = now
-    return dwellMs
-  }
+  // 画面に出す既読は、今の教材にある章だけ
+  const readInDocument = computed(() => {
+    const leaves = session.value?.leafIds
+    return leaves === undefined ? [] : readSectionIds.value.filter((id) => leaves.has(id))
+  })
 
   const currentSection = computed(() => {
     const id = position.value?.sectionId
@@ -57,10 +55,10 @@ export function useReaderFrame(path: string) {
     const scrollTop = current.win.scrollY
     const boxes = measure(current)
     position.value = positionAt(boxes, scrollTop, maxScroll(current))
-    const dwell = accumulateDwell(position.value.sectionId, Date.now())
+    const totals = dwell.move(position.value.sectionId, Date.now())
     if (!markFinished) return
     const leaves = boxes.filter((box) => current.leafIds.has(box.id))
-    const added = finishedSectionIds(leaves, scrollTop, current.win.innerHeight, dwell).filter(
+    const added = finishedSectionIds(leaves, scrollTop, current.win.innerHeight, totals).filter(
       (id) => !readSectionIds.value.includes(id),
     )
     if (added.length > 0) readSectionIds.value = [...readSectionIds.value, ...added]
@@ -69,6 +67,8 @@ export function useReaderFrame(path: string) {
   function progressEntry(): DocumentProgress | null {
     const current = session.value
     if (current === null || position.value === null) return null
+    // 章が1つも取れない教材で、章のあった記録を上書きしない（読み込みに失敗した可能性がある）
+    if (current.leafIds.size === 0 && (store.state.progress[path]?.sectionCount ?? 0) > 0) return null
     return {
       path,
       lastOpenedAt: new Date().toISOString(),
@@ -100,9 +100,13 @@ export function useReaderFrame(path: string) {
     }, SCROLL_THROTTLE_MS)
   }
 
-  async function open(win: Window, doc: Document): Promise<ReaderSession> {
+  // 読み込みが重なったとき、古い方の続きで新しい方を壊さないよう世代で見分ける
+  async function open(win: Window, doc: Document): Promise<ReaderSession | null> {
+    const mine = ++generation
     detach?.()
+    detach = null
     await doc.fonts.ready
+    if (mine !== generation) return null
     const sections = detectSections(doc)
     let map: TextMap | null = null
     const opened: ReaderSession = {
@@ -112,15 +116,19 @@ export function useReaderFrame(path: string) {
       leafIds: new Set(sections.filter((section) => section.isLeaf).map((section) => section.id)),
       textMap: () => (map ??= buildTextMap(doc.body)),
     }
-    readSectionIds.value = (store.state.progress[path]?.readSectionIds ?? []).filter((id) => opened.leafIds.has(id))
-    dwellMs = new Map()
-    dwellSectionId = null
-    dwellSince = Date.now()
+    readSectionIds.value = [...(store.state.progress[path]?.readSectionIds ?? [])]
+    dwell.start(Date.now())
     session.value = opened
 
     const onPageHide = () => saveNow(true)
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') saveNow(true)
+      if (document.visibilityState === 'hidden') {
+        // 見ていない間は滞在時間を数えない
+        dwell.pause(Date.now())
+        saveNow(true)
+        return
+      }
+      dwell.resume(Date.now())
     }
     win.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('pagehide', onPageHide)
@@ -200,6 +208,7 @@ export function useReaderFrame(path: string) {
     position,
     currentSection,
     readSectionIds,
+    readInDocument,
     open,
     goToPosition,
     goToSection,
