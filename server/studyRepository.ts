@@ -96,17 +96,34 @@ export function createStudyRepository(vaultDir: string) {
     return { progress: progressFile.documents, bookmarks: bookmarksFile.items, highlights: highlightsFile.items }
   }
 
-  async function summarize(path: string): Promise<RecordsSummary> {
+  async function countRecords(path: string): Promise<RecordsSummary> {
     const current = await state()
-    const summary = {
+    return {
       progress: current.progress[path] === undefined ? 0 : 1,
       bookmarks: current.bookmarks.filter((item) => item.path === path).length,
       highlights: current.highlights.filter((item) => item.path === path).length,
     }
-    if (summary.progress + summary.bookmarks + summary.highlights === 0) {
-      throw new HttpError(404, `${path} の記録はありません`)
-    }
+  }
+
+  const isEmpty = (summary: RecordsSummary) => summary.progress + summary.bookmarks + summary.highlights === 0
+
+  async function summarize(path: string): Promise<RecordsSummary> {
+    const summary = await countRecords(path)
+    if (isEmpty(summary)) throw new HttpError(404, `${path} の記録はありません`)
     return summary
+  }
+
+  async function relocate(from: string, to: string): Promise<void> {
+    await progress.update((file) => {
+      const source = file.documents[from]
+      if (source === undefined) return { next: file, result: undefined }
+      const documents = { ...file.documents }
+      delete documents[from]
+      documents[to] = mergeProgress(source, documents[to], to)
+      return { next: { ...file, documents }, result: undefined }
+    })
+    await bookmarks.repath(from, to)
+    await highlights.repath(from, to)
   }
 
   return {
@@ -123,16 +140,14 @@ export function createStudyRepository(vaultDir: string) {
 
     async moveRecords({ from, to }: RecordsMove): Promise<RecordsSummary> {
       const summary = await summarize(from)
-      await progress.update((file) => {
-        const source = file.documents[from]
-        if (source === undefined) return { next: file, result: undefined }
-        const documents = { ...file.documents }
-        delete documents[from]
-        documents[to] = mergeProgress(source, documents[to], to)
-        return { next: { ...file, documents }, result: undefined }
-      })
-      await bookmarks.repath(from, to)
-      await highlights.repath(from, to)
+      await relocate(from, to)
+      return summary
+    },
+
+    // 資料そのものを移したときの付け替え。まだ記録が無い資料でも失敗しない
+    async relocateRecords(from: string, to: string): Promise<RecordsSummary> {
+      const summary = await countRecords(from)
+      if (!isEmpty(summary)) await relocate(from, to)
       return summary
     },
 

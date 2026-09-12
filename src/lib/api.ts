@@ -6,6 +6,8 @@ import type {
   DocumentProgress,
   Highlight,
   HighlightPatch,
+  MoveDocument,
+  MoveDocumentResult,
   NewBookmark,
   NewHighlight,
   RecordsMove,
@@ -64,6 +66,7 @@ export const api = {
     request<Highlight>('PATCH', `/api/highlights/${encodeURIComponent(id)}`, patch),
   deleteHighlight: (id: string) => request<void>('DELETE', `/api/highlights/${encodeURIComponent(id)}`),
 
+  moveDocument: (input: MoveDocument) => request<MoveDocumentResult>('POST', '/api/documents/move', input),
   moveRecords: (move: RecordsMove) => request<RecordsSummary>('POST', '/api/records/move', move),
   deleteRecords: (path: string) => request<RecordsSummary>('DELETE', `/api/records?path=${encodeURIComponent(path)}`),
 

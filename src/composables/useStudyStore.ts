@@ -6,12 +6,14 @@ import type {
   DocumentProgress,
   Highlight,
   HighlightPatch,
+  MoveDocumentResult,
   NewBookmark,
   NewHighlight,
   RecordsMove,
   RecordsSummary,
 } from '../../shared/types'
 import { api } from '../lib/api'
+import { projectFolderOf } from '../lib/projects'
 import type { OrphanRecord } from '../types/ui'
 
 type StoreState = {
@@ -100,6 +102,13 @@ async function reloadAll(): Promise<void> {
   await loadStudyState()
 }
 
+// 資料そのものをプロジェクト（フォルダ）へ移す。ファイルと記録はサーバーが一緒に動かす
+async function moveDocument(path: string, folder: string): Promise<MoveDocumentResult> {
+  const result = await api.moveDocument({ path, folder })
+  await reloadAll()
+  return result
+}
+
 async function moveRecords(move: RecordsMove): Promise<RecordsSummary> {
   const summary = await api.moveRecords(move)
   await reloadAll()
@@ -111,6 +120,12 @@ async function deleteRecords(path: string): Promise<RecordsSummary> {
   await reloadAll()
   return summary
 }
+
+const projectFolders = computed(() =>
+  [...new Set(state.documents.map((document) => projectFolderOf(document.path)))]
+    .filter((folder) => folder !== '')
+    .sort((a, b) => a.localeCompare(b, 'ja')),
+)
 
 const documentsByPath = computed(() => new Map(state.documents.map((document) => [document.path, document])))
 
@@ -141,6 +156,7 @@ export function useStudyStore() {
   return {
     state,
     documentsByPath,
+    projectFolders,
     latestProgress,
     orphanRecords,
     loadStudyState,
@@ -152,6 +168,7 @@ export function useStudyStore() {
     addHighlight,
     updateHighlight,
     deleteHighlight,
+    moveDocument,
     moveRecords,
     deleteRecords,
   }

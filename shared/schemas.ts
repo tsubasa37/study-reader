@@ -82,6 +82,12 @@ export const RecordsMoveSchema = z
   .object({ from: documentPath, to: documentPath })
   .refine((move) => move.from !== move.to, { message: '引き継ぎ元と引き継ぎ先が同じです' })
 
+export const MoveDocumentSchema = z.object({
+  path: documentPath,
+  // '' は資料フォルダ直下（プロジェクトから出す）
+  folder: z.string().max(200),
+})
+
 export const ProgressFileSchema = z.object({
   version: z.literal(1),
   documents: z.record(z.string(), DocumentProgressSchema),
@@ -107,6 +113,7 @@ export type NewHighlight = z.infer<typeof NewHighlightSchema>
 export type BookmarkPatch = z.infer<typeof BookmarkPatchSchema>
 export type HighlightPatch = z.infer<typeof HighlightPatchSchema>
 export type RecordsMove = z.infer<typeof RecordsMoveSchema>
+export type MoveDocument = z.infer<typeof MoveDocumentSchema>
 export type ProgressFile = z.infer<typeof ProgressFileSchema>
 export type BookmarksFile = z.infer<typeof BookmarksFileSchema>
 export type HighlightsFile = z.infer<typeof HighlightsFileSchema>

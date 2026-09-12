@@ -5,12 +5,14 @@ import {
   BookmarkPatchSchema,
   DocumentProgressSchema,
   HighlightPatchSchema,
+  MoveDocumentSchema,
   NewBookmarkSchema,
   NewHighlightSchema,
   RecordsMoveSchema,
 } from '../shared/schemas'
 import type { DocumentList } from '../shared/types'
 import { HttpError } from './errors'
+import { moveDocument } from './documentMover'
 import { decodePathname, isFile, sendFile } from './files'
 import { createStudyRepository } from './studyRepository'
 import { resolveVaultPath, scanDocuments } from './vault'
@@ -45,6 +47,9 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
     return c.json(list)
   })
   app.get('/api/state', async (c) => c.json(await repository.state()))
+  app.post('/api/documents/move', async (c) =>
+    c.json(await moveDocument(vaultDir, repository, MoveDocumentSchema.parse(await readJson(c)))),
+  )
   app.put('/api/progress', async (c) =>
     c.json(await repository.saveProgress(DocumentProgressSchema.parse(await readJson(c)))),
   )

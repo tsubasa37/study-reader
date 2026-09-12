@@ -3,8 +3,12 @@ import { Bookmark, Highlighter } from '@lucide/vue'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { DocumentEntry, DocumentProgress } from '../../../shared/types'
+import { notify } from '../../composables/useNotices'
+import { useStudyStore } from '../../composables/useStudyStore'
 import { formatWhen } from '../../lib/format'
 import { summarizeProgress } from '../../lib/progressSummary'
+import { projectFolderOf } from '../../lib/projects'
+import MoveMenu from './MoveMenu.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -17,11 +21,19 @@ const props = withDefaults(
   { showFolder: true },
 )
 
+const store = useStudyStore()
 const summary = computed(() => summarizeProgress(props.progress ?? undefined))
+
+async function move(folder: string): Promise<void> {
+  const result = await store.moveDocument(props.document.path, folder)
+  const where = folder === '' ? '資料フォルダの直下' : folder
+  const extra = result.movedFiles.length > 1 ? `（${result.movedFiles.length} ファイル）` : ''
+  notify(`${props.document.name} を ${where} へ移しました${extra}`)
+}
 </script>
 
 <template>
-  <li>
+  <li class="item">
     <RouterLink class="row" :to="{ name: 'read', query: { path: document.path } }">
       <span class="name">
         <strong>{{ document.name }}</strong>
@@ -37,23 +49,35 @@ const summary = computed(() => summarizeProgress(props.progress ?? undefined))
       </span>
       <span class="when num">{{ progress ? formatWhen(progress.lastOpenedAt) : '—' }}</span>
     </RouterLink>
+    <MoveMenu
+      :name="document.name"
+      :folders="store.projectFolders.value"
+      :current="projectFolderOf(document.path)"
+      @move="move"
+    />
   </li>
 </template>
 
 <style scoped>
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-top: 1px solid var(--rule);
+}
+
+.item:hover {
+  background: var(--paper);
+}
+
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 170px 96px 76px;
   gap: 16px;
   align-items: center;
   padding: 14px 6px;
-  border-top: 1px solid var(--rule);
   color: var(--ink);
   text-decoration: none;
-}
-
-.row:hover {
-  background: var(--paper);
 }
 
 .name {

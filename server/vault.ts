@@ -38,6 +38,21 @@ async function collect(vaultDir: string, dir: string, documents: DocumentEntry[]
   }
 }
 
+// プロジェクトのフォルダは資料フォルダ直下の1段だけ。'' は資料フォルダそのもの
+export function resolveProjectFolder(vaultDir: string, folder: string): string {
+  if (folder === '') return vaultDir
+  const unsafe =
+    folder !== folder.trim() ||
+    folder.startsWith('.') ||
+    folder.includes('/') ||
+    folder.includes('\\') ||
+    folder.includes('\0')
+  if (unsafe) throw new HttpError(400, `プロジェクト名に使えない文字が入っています: ${folder}`)
+  const fullPath = resolve(vaultDir, folder)
+  if (!fullPath.startsWith(vaultDir + sep)) throw new HttpError(400, `資料フォルダの外には作れません: ${folder}`)
+  return fullPath
+}
+
 export function resolveVaultPath(vaultDir: string, relativePath: string): string {
   const segments = relativePath.split('/')
   const unsafe = segments.some(

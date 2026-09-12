@@ -7,6 +7,7 @@ export type {
   Highlight,
   HighlightPatch,
   NewBookmark,
+  MoveDocument,
   NewHighlight,
   ReadingPosition,
   RecordsMove,
@@ -31,6 +32,12 @@ export type StudyState = {
   progress: Record<string, DocumentProgress>
   bookmarks: Bookmark[]
   highlights: Highlight[]
+}
+
+export type MoveDocumentResult = {
+  path: string
+  movedFiles: string[]
+  records: RecordsSummary
 }
 
 export type RecordsSummary = {
