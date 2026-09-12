@@ -1,8 +1,17 @@
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { HighlightColor, TextQuote } from '../../shared/types'
 import { locateQuote } from '../lib/anchoring'
-import { applyDocumentNavHidden, loadDocumentNavHidden, saveDocumentNavHidden } from '../lib/documentChrome'
+import {
+  applyDocChrome,
+  clampNavWidth,
+  loadDocNavHidden,
+  loadDocNavWidth,
+  measureDocumentNav,
+  saveDocNavHidden,
+  saveDocNavWidth,
+  type DocNavMetrics,
+} from '../lib/documentChrome'
 import { attachFrameInteractions, excerptAtTop } from '../lib/frameInteractions'
 import { flashRange } from '../lib/highlightPainter'
 import { indexesToRange } from '../lib/textMap'
@@ -31,7 +40,17 @@ export function useReaderPage(props: ReaderProps) {
   const highlights = useReaderHighlights(props.path, frame.session)
   const panelOpen = ref(true)
   const panelTab = ref<PanelTab>('toc')
-  const docNavHidden = ref(loadDocumentNavHidden())
+  const docNavHidden = ref(loadDocNavHidden())
+  const docNavWidth = ref<number | null>(loadDocNavWidth())
+  const docNavMetrics = shallowRef<DocNavMetrics | null>(null)
+  // つまみは目次の右端に置く。中央寄せの教材では目次の左端が 0 ではないので、その分ずらす。
+  // 隠しているときと、幅を変えられない目次（引き出し式など）の教材では出さない
+  const docNavHandle = computed(() => {
+    const metrics = docNavMetrics.value
+    if (docNavHidden.value || metrics === null) return null
+    const width = docNavWidth.value ?? metrics.navWidth
+    return { x: metrics.navLeft + width, width }
+  })
   const activeBookmarkId = ref<string | null>(null)
   const activeHighlightId = ref<string | null>(null)
   // メモ欄を開くのは作った直後だけ。飛んできただけのときは開かない
@@ -135,7 +154,7 @@ export function useReaderPage(props: ReaderProps) {
     await loadStudyState()
     if (document.value === null) return
     const opened = await frame.open(win, doc)
-    applyDocumentNavHidden(doc, docNavHidden.value)
+    refreshDocNavMetrics()
     detachInteractions?.()
     const detachHighlights = highlights.attach(opened, focusHighlight)
     const detachFrame = attachFrameInteractions(opened, {
@@ -155,12 +174,38 @@ export function useReaderPage(props: ReaderProps) {
     frame.markOpened()
   }
 
-  // 教材が自前で持つ目次を隠して本文を広げる。教材のファイルは書き換えない
+  // 教材が自前で持つ目次の見え方を変える。教材のファイルは書き換えず、表示の指定だけ重ねる
+  function applyChrome(): void {
+    const current = frame.session.value
+    if (current === null) return
+    applyDocChrome(current.doc, { hidden: docNavHidden.value, width: docNavWidth.value }, docNavMetrics.value)
+  }
+
+  // 測るときは自分が足した指定をいったん外す（自分の変更を測ってしまわないため）
+  function refreshDocNavMetrics(): void {
+    const current = frame.session.value
+    if (current === null) return
+    applyDocChrome(current.doc, { hidden: false, width: null }, null)
+    docNavMetrics.value = measureDocumentNav(current.doc)
+    applyChrome()
+  }
+
   function toggleDocNav(): void {
     docNavHidden.value = !docNavHidden.value
-    saveDocumentNavHidden(docNavHidden.value)
-    const current = frame.session.value
-    if (current !== null) applyDocumentNavHidden(current.doc, docNavHidden.value)
+    saveDocNavHidden(docNavHidden.value)
+    applyChrome()
+  }
+
+  function setDocNavWidth(width: number, persist: boolean): void {
+    docNavWidth.value = clampNavWidth(width)
+    applyChrome()
+    if (persist) saveDocNavWidth(docNavWidth.value)
+  }
+
+  function resetDocNavWidth(): void {
+    docNavWidth.value = null
+    saveDocNavWidth(null)
+    applyChrome()
   }
 
   async function addBookmark(): Promise<void> {
@@ -203,7 +248,19 @@ export function useReaderPage(props: ReaderProps) {
     },
   )
 
-  onBeforeUnmount(() => detachInteractions?.())
+  // 画面幅が変わると教材の作りも切り替わるので測り直す
+  let remeasureTimer: ReturnType<typeof setTimeout> | null = null
+  function onWindowResize(): void {
+    if (remeasureTimer !== null) clearTimeout(remeasureTimer)
+    remeasureTimer = setTimeout(refreshDocNavMetrics, 200)
+  }
+  window.addEventListener('resize', onWindowResize)
+
+  onBeforeUnmount(() => {
+    detachInteractions?.()
+    window.removeEventListener('resize', onWindowResize)
+    if (remeasureTimer !== null) clearTimeout(remeasureTimer)
+  })
 
   return {
     store,
@@ -217,7 +274,10 @@ export function useReaderPage(props: ReaderProps) {
     panelOpen,
     panelTab,
     docNavHidden,
+    docNavHandle,
     toggleDocNav,
+    setDocNavWidth,
+    resetDocNavWidth,
     activeBookmarkId,
     activeHighlightId,
     editRequestId,

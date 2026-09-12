@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import BookmarksTab from '../components/reader/BookmarksTab.vue'
+import DocNavHandle from '../components/reader/DocNavHandle.vue'
 import HighlightsTab from '../components/reader/HighlightsTab.vue'
 import ReaderBar from '../components/reader/ReaderBar.vue'
 import SelectionToolbar from '../components/reader/SelectionToolbar.vue'
@@ -42,6 +43,14 @@ function removeHighlight(id: string): void {
     <div v-else class="stage">
       <div class="frame-wrap">
         <iframe :src="vaultUrl(path)" :title="document?.name ?? path" @load="reader.onFrameLoad" />
+        <DocNavHandle
+          v-if="reader.docNavHandle.value !== null"
+          :x="reader.docNavHandle.value.x"
+          :width="reader.docNavHandle.value.width"
+          @resize="(width) => reader.setDocNavWidth(width, false)"
+          @commit="(width) => reader.setDocNavWidth(width, true)"
+          @reset="reader.resetDocNavWidth"
+        />
         <SelectionToolbar
           v-if="highlights.selection.value"
           :draft="highlights.selection.value"
