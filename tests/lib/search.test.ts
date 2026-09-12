@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { locateQuote } from '../../src/lib/anchoring'
-import { indexDocument, matchesText, searchDocuments } from '../../src/lib/search'
+import { foldForSearch, indexDocument, matchesText, searchDocuments } from '../../src/lib/search'
 import { parseHtml } from './helpers'
 
 const indexed = indexDocument(
@@ -48,5 +48,33 @@ describe('matchesText', () => {
   it('含まれていなければ不一致、空の検索語も不一致', () => {
     expect(matchesText(['交差型'], 'union')).toBe(false)
     expect(matchesText(['交差型'], ' ')).toBe(false)
+  })
+})
+
+describe('foldForSearch', () => {
+  it('全角英数と大文字は半角小文字にそろえる', () => {
+    expect(foldForSearch('ＴｙｐｅScript１')).toBe('typescript1')
+  })
+
+  it('NFKC で長さが変わる文字はそのまま残す（本文の位置がずれないため）', () => {
+    const text = 'あ…⑩Ａ'
+
+    const folded = foldForSearch(text)
+
+    expect(folded).toBe('あ…⑩a')
+    expect(folded.length).toBe(text.length)
+  })
+
+  it('… を含む本文でも、見つけた位置がその文字を指す', () => {
+    const indexedWithEllipsis = indexDocument(
+      '例.html',
+      '例',
+      parseHtml('<section id="s"><h2>章</h2><p>まず…そしてTypeScriptの話。</p></section>'),
+    )
+
+    const [hit] = searchDocuments([indexedWithEllipsis], 'typescript')
+
+    expect(hit).toBeDefined()
+    expect(indexedWithEllipsis.text.slice(hit?.quote.start, (hit?.quote.start ?? 0) + 10)).toBe('TypeScript')
   })
 })

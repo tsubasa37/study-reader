@@ -27,14 +27,15 @@ export type SearchHit = {
 const SNIPPET_BEFORE = 36
 const SNIPPET_AFTER = 64
 
+// 変わりうる文字だけを直す。漢字・かな・ASCII 小文字はそのまま通す（1文字ずつ変換すると10倍以上遅い）
+const FOLDABLE = /[^\u0000-\u007F\u3041-\u30FF\u4E00-\u9FFF]|[A-Z]/gu
+
 // 全角英数と半角、大文字と小文字を同じに扱う。1文字が2文字以上に変わる場合は元のまま（位置をずらさないため）
 export function foldForSearch(text: string): string {
-  let folded = ''
-  for (const char of text) {
+  return text.replace(FOLDABLE, (char) => {
     const converted = char.normalize('NFKC').toLowerCase()
-    folded += converted.length === char.length ? converted : char
-  }
-  return folded
+    return converted.length === char.length ? converted : char
+  })
 }
 
 export function matchesText(fields: readonly string[], query: string): boolean {
