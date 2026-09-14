@@ -11,22 +11,25 @@ afterEach(async () => {
 })
 
 describe('scanDocuments', () => {
-  it('HTML だけを、隠しフォルダと隠しファイルを除いてパス順に返す', async () => {
+  it('HTML と PDF を種類付きで、隠しフォルダと隠しファイルを除いてパス順に返す', async () => {
     vault = await createTempVault({
       'Vue3基礎教科書.html': '<p>vue</p>',
       'infra/Ansible.htm': '<p>ansible</p>',
-      'TypeScript基礎教科書.pdf': 'pdf',
+      'TypeScript基礎教科書.PDF': 'pdf',
+      'メモ.txt': 'memo',
       '.study/progress.json': '{}',
       '.hidden.html': '<p>hidden</p>',
+      '.hidden.pdf': 'pdf',
     })
 
     const documents = await scanDocuments(vault.dir)
 
-    expect(documents.map((document) => [document.path, document.name, document.folder])).toEqual([
-      ['infra/Ansible.htm', 'Ansible', 'infra'],
-      ['Vue3基礎教科書.html', 'Vue3基礎教科書', ''],
+    expect(documents.map((document) => [document.path, document.name, document.folder, document.kind])).toEqual([
+      ['infra/Ansible.htm', 'Ansible', 'infra', 'html'],
+      ['TypeScript基礎教科書.PDF', 'TypeScript基礎教科書', '', 'pdf'],
+      ['Vue3基礎教科書.html', 'Vue3基礎教科書', '', 'html'],
     ])
-    expect(documents[1]?.size).toBe('<p>vue</p>'.length)
+    expect(documents.find((document) => document.path === 'Vue3基礎教科書.html')?.size).toBe('<p>vue</p>'.length)
   })
 })
 

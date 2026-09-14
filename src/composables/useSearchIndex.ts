@@ -33,8 +33,10 @@ async function ensureIndex(documents: readonly DocumentEntry[]): Promise<Indexed
   try {
     const parser = new DOMParser()
     const done: IndexedDocument[] = []
+    // 本文を読み込めるのは HTML の教材だけ。PDF は本文検索の対象にしない
+    const htmlDocuments = documents.filter((document) => document.kind === 'html')
     await Promise.all(
-      documents.map(async (document) => {
+      htmlDocuments.map(async (document) => {
         const one = await indexOne(document, parser)
         done.push(one)
         // 1冊できるたびに検索できるようにする

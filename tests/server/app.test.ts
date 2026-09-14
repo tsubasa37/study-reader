@@ -99,11 +99,15 @@ const highlight = (path = DOC): NewHighlight => ({
 })
 
 describe('資料', () => {
-  it('資料フォルダの名前と HTML の一覧を返す', async () => {
+  it('資料フォルダの名前と、HTML・PDF の一覧を種類付きで返す', async () => {
     const body = (await (await send('GET', '/api/documents')).json()) as DocumentList
 
     expect(body.vaultName).toBe(vault.dir.split('/').pop())
-    expect(body.documents.map((document) => document.path)).toEqual([NESTED, DOC])
+    expect(body.documents.map((document) => [document.path, document.kind])).toEqual([
+      [NESTED, 'html'],
+      [DOC, 'html'],
+      ['TypeScript基礎教科書.pdf', 'pdf'],
+    ])
   })
 
   it('日本語名の HTML を text/html で返す', async () => {
@@ -492,5 +496,33 @@ describe('教材の配信', () => {
 
     expect(second.status).toBe(304)
     expect(await second.text()).toBe('')
+  })
+})
+
+describe('PDF の表示に使う付属ファイル', () => {
+  it.each([
+    ['cmaps/UniJIS-UCS2-H.bcmap', 'application/octet-stream'],
+    ['standard_fonts/LiberationSans-Regular.ttf', 'font/ttf'],
+    ['wasm/openjpeg.wasm', 'application/wasm'],
+    ['iccs/CGATS001Compat-v2-micro.icc', 'application/octet-stream'],
+  ])('/pdfjs/%s を %s で返す', async (file, type) => {
+    const response = await send('GET', `/pdfjs/${file}`)
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe(type)
+    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0)
+  })
+
+  it.each([
+    '/pdfjs/build/pdf.mjs',
+    '/pdfjs/package.json',
+    '/pdfjs/cmaps',
+    `/pdfjs/cmaps/${encodeURIComponent('無い.bcmap')}`,
+  ])('%s は 404（決めたフォルダの中の実ファイルだけ返す）', async (path) => {
+    expect((await send('GET', path)).status).toBe(404)
+  })
+
+  it.each(['/pdfjs/cmaps/..%2F..%2Fpackage.json', '/pdfjs/cmaps/.hidden'])('%s は 400', async (path) => {
+    expect((await send('GET', path)).status).toBe(400)
   })
 })

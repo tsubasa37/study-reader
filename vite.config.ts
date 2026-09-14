@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       '/api': apiServer,
       '/vault': apiServer,
+      '/pdfjs': apiServer,
     },
   },
 })

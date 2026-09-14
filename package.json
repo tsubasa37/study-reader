@@ -18,6 +18,7 @@
     "@hono/node-server": "^2.1.1",
     "@lucide/vue": "^1.45.0",
     "hono": "^4.13.7",
+    "pdfjs-dist": "^6.3.289",
     "vue": "^3.5.42",
     "vue-router": "^4.6.4",
     "zod": "^4.6.2"

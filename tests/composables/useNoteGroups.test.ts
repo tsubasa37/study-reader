@@ -18,6 +18,7 @@ const document_ = (path: string): DocumentEntry => ({
   path,
   name: (path.split('/').pop() ?? path).replace(/\.html$/, ''),
   folder: '',
+  kind: 'html',
   size: 1,
   modifiedAt: '2026-09-12T00:00:00.000Z',
 })

@@ -16,6 +16,7 @@ describe('contentTypeFor', () => {
   it.each([
     ['a.html', 'text/html; charset=utf-8'],
     ['a.pdf', 'application/pdf'],
+    ['a.wasm', 'application/wasm'],
     ['a.PNG', 'image/png'],
     ['a.unknown', 'application/octet-stream'],
   ])('%s は %s', (file, expected) => {

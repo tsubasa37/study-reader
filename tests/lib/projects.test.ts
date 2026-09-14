@@ -6,6 +6,7 @@ const document = (path: string): DocumentEntry => ({
   path,
   name: path.slice(path.lastIndexOf('/') + 1).replace(/\.html$/, ''),
   folder: path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '',
+  kind: 'html',
   size: 100,
   modifiedAt: '2026-09-11T00:00:00.000Z',
 })

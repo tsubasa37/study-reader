@@ -17,10 +17,13 @@ export type {
 } from './schemas'
 export type { HighlightColor } from './constants'
 
+export type DocumentKind = 'html' | 'pdf'
+
 export type DocumentEntry = {
   path: string
   name: string
   folder: string
+  kind: DocumentKind
   size: number
   modifiedAt: string
 }

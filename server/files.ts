@@ -24,6 +24,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
   '.pdf': 'application/pdf',
+  '.wasm': 'application/wasm',
 }
 
 // 教材の中のスクリプトは動いたままにして（教材自身の目次や色付けが壊れるため）、

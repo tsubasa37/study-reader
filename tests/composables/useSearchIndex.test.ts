@@ -10,8 +10,9 @@ const documentHtml = vi.mocked(api.documentHtml)
 
 const entry = (path: string, modifiedAt = '2026-09-12T00:00:00.000Z'): DocumentEntry => ({
   path,
-  name: path.replace(/\.html$/, ''),
+  name: path.replace(/\.(html|pdf)$/, ''),
   folder: '',
+  kind: path.endsWith('.pdf') ? 'pdf' : 'html',
   size: 100,
   modifiedAt,
 })
@@ -80,6 +81,16 @@ describe('useSearchIndex', () => {
     await ensureIndex([entry('a.html'), entry('b.html')])
     await ensureIndex([entry('a.html')])
 
+    expect(indexed.value.map((document) => document.path)).toEqual(['a.html'])
+  })
+
+  it('PDF は本文を読み込まず、検索の対象にしない', async () => {
+    const { ensureIndex, indexed } = useSearchIndex()
+
+    await ensureIndex([entry('a.html'), entry('b.pdf')])
+
+    expect(documentHtml).toHaveBeenCalledTimes(1)
+    expect(documentHtml).toHaveBeenCalledWith('a.html')
     expect(indexed.value.map((document) => document.path)).toEqual(['a.html'])
   })
 })

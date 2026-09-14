@@ -16,6 +16,7 @@ import { HttpError } from './errors'
 import { moveDocument } from './documentMover'
 import { VAULT_CSP, decodePathname, isFile, sendFile } from './files'
 import { guard } from './guard'
+import { realPdfjsAssetPath } from './pdfjsAssets'
 import { reconcileRecords } from './reconcile'
 import { createStudyRepository } from './studyRepository'
 import { realVaultPath, resolveVaultPath, scanDocuments } from './vault'
@@ -124,6 +125,7 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
   app.get('/vault/*', async (c) =>
     sendFile(c, await realVaultPath(vaultDir, decodePathname(c.req.url, '/vault/')), { csp: VAULT_CSP }),
   )
+  app.get('/pdfjs/*', async (c) => sendFile(c, await realPdfjsAssetPath(decodePathname(c.req.url, '/pdfjs/'))))
 
   if (clientDir !== null) {
     app.get('*', async (c) => {
