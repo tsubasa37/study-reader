@@ -8,6 +8,7 @@ import {
   MoveDocumentSchema,
   NewBookmarkSchema,
   NewHighlightSchema,
+  SettingsSchema,
 } from '../shared/schemas'
 import type { DocumentEntry, DocumentList } from '../shared/types'
 import { bodyLimit } from 'hono/body-limit'
@@ -88,6 +89,11 @@ export function createApp({ vaultDir, clientDir }: AppOptions): Hono {
     await assertDocument(vaultDir, entry.path)
     return c.json(await repository.saveProgress(entry))
   })
+
+  app.get('/api/settings', async (c) => c.json(await repository.settings()))
+  app.put('/api/settings', async (c) =>
+    c.json(await repository.saveSettings(SettingsSchema.parse(await readJson(c)))),
+  )
 
   app.post('/api/bookmarks', async (c) => {
     const input = NewBookmarkSchema.parse(await readJson(c))

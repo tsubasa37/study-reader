@@ -5,6 +5,7 @@ import {
   BookmarksFileSchema,
   HighlightsFileSchema,
   ProgressFileSchema,
+  SettingsFileSchema,
   type BookmarksFile,
   type DocumentProgress,
   type HighlightsFile,
@@ -12,7 +13,10 @@ import {
   type NewHighlight,
   type ArchiveFile,
   type ProgressFile,
+  type Settings,
+  type SettingsFile,
 } from '../shared/schemas'
+import { DEFAULT_HIGHLIGHT_COLOR_NAMES } from '../shared/constants'
 import type { RecordsSummary, StudyState } from '../shared/types'
 import { HttpError } from './errors'
 import { JsonStore } from './store'
@@ -91,6 +95,10 @@ export function createStudyRepository(vaultDir: string) {
     bookmarks: [],
     highlights: [],
   }))
+  const settingsStore = new JsonStore<SettingsFile>(join(dir, 'settings.json'), SettingsFileSchema, () => ({
+    version: 1,
+    highlightColorNames: { ...DEFAULT_HIGHLIGHT_COLOR_NAMES },
+  }))
 
   const bookmarks = createCollection<NewBookmark>(bookmarkStore, 'しおりが見つかりません')
   const highlights = createCollection<NewHighlight>(highlightStore, 'ハイライトが見つかりません')
@@ -138,6 +146,15 @@ export function createStudyRepository(vaultDir: string) {
         next: { ...file, documents: { ...file.documents, [entry.path]: entry } },
         result: entry,
       }))
+    },
+
+    async settings(): Promise<Settings> {
+      const { highlightColorNames } = await settingsStore.read()
+      return { highlightColorNames }
+    },
+
+    saveSettings(settings: Settings): Promise<Settings> {
+      return settingsStore.update((file) => ({ next: { ...file, ...settings }, result: settings }))
     },
 
     // 資料そのものを移したときの付け替え。まだ記録が無い資料でも失敗しない

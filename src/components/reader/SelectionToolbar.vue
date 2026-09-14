@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { NotebookPen } from '@lucide/vue'
 import { computed } from 'vue'
-import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_LABELS, type HighlightColor } from '../../../shared/constants'
+import { HIGHLIGHT_COLORS, type HighlightColor } from '../../../shared/constants'
+import { useStudyStore } from '../../composables/useStudyStore'
 import { swatchBackground } from '../../lib/highlightPainter'
+import { colorTitle } from '../../lib/labels'
 import type { SelectionDraft } from '../../types/ui'
 
 const props = defineProps<{ draft: SelectionDraft }>()
 const emit = defineEmits<{ pick: [color: HighlightColor]; memo: [] }>()
+const store = useStudyStore()
 
 const ROOM_ABOVE = 56
 
@@ -28,8 +31,8 @@ const placement = computed(() => {
       class="dot"
       type="button"
       :style="{ background: swatchBackground(color) }"
-      :aria-label="`${HIGHLIGHT_COLOR_LABELS[color]}で塗る`"
-      :title="`${HIGHLIGHT_COLOR_LABELS[color]}で塗る`"
+      :aria-label="`${colorTitle(store.state.highlightColorNames, color)}で塗る`"
+      :title="`${colorTitle(store.state.highlightColorNames, color)}で塗る`"
       @mousedown.prevent
       @click="emit('pick', color)"
     />

@@ -5,6 +5,7 @@ import {
   finishedSectionIds,
   positionAt,
   scrollTopFor,
+  visibleSectionIds,
   type SectionBox,
 } from '../../src/lib/position'
 
@@ -60,6 +61,19 @@ describe('scrollTopFor', () => {
       top: 350,
       sectionFound: true,
     })
+  })
+})
+
+describe('visibleSectionIds', () => {
+  it('画面に少しでも入っている章を返し、上に抜けた章とまだ下にある章は除く', () => {
+    // 画面は 500〜1200。ch1 は 500 で終わり、ch3 は 1200 から始まる
+    expect(visibleSectionIds(boxes, 500, 700)).toEqual(['part1', 'ch2'])
+  })
+
+  it('表示されていない章（高さ 0）は数えない', () => {
+    const hidden = [...boxes, { id: 'hidden', top: 600, height: 0 }]
+
+    expect(visibleSectionIds(hidden, 500, 700)).toEqual(['part1', 'ch2'])
   })
 })
 

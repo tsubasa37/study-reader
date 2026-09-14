@@ -1,7 +1,14 @@
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import type { DocumentProgress, ReadingPosition } from '../../shared/types'
 import { DwellTracker } from '../lib/dwell'
-import { finishedSectionIds, positionAt, scrollTopFor, type SectionBox } from '../lib/position'
+import {
+  READ_DWELL_MS,
+  finishedSectionIds,
+  positionAt,
+  scrollTopFor,
+  visibleSectionIds,
+  type SectionBox,
+} from '../lib/position'
 import { detectSections } from '../lib/sections'
 import { buildTextMap, type TextMap } from '../lib/textMap'
 import type { ReaderSession } from '../types/ui'
@@ -12,6 +19,8 @@ const SCROLL_THROTTLE_MS = 150
 const SAVE_DELAY_MS = 1200
 // 自分で動かしたスクロールでは「読み終えた章」を付けない
 const PROGRAMMATIC_SCROLL_MS = 800
+// スクロールが止まったあと、滞在時間がたまったころにもう一度だけ既読を確かめる
+const SETTLE_MS = READ_DWELL_MS + 100
 
 const pixels = (value: string) => Number.parseFloat(value) || 0
 
@@ -24,6 +33,7 @@ export function useReaderFrame(path: string) {
   let generation = 0
   let throttleTimer: ReturnType<typeof setTimeout> | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let settleTimer: ReturnType<typeof setTimeout> | null = null
   let programmaticUntil = 0
   let detach: (() => void) | null = null
   // 章ごとの滞在時間。通り過ぎただけの章を既読にしないために測る
@@ -55,9 +65,10 @@ export function useReaderFrame(path: string) {
     const scrollTop = current.win.scrollY
     const boxes = measure(current)
     position.value = positionAt(boxes, scrollTop, maxScroll(current))
-    const totals = dwell.move(position.value.sectionId, Date.now())
-    if (!markFinished) return
     const leaves = boxes.filter((box) => current.leafIds.has(box.id))
+    // 読んでいる線の章だけでなく、画面に見えている章すべての滞在を数える（短い章や最後の章も既読にできるように）
+    const totals = dwell.move(visibleSectionIds(leaves, scrollTop, current.win.innerHeight), Date.now())
+    if (!markFinished) return
     const added = finishedSectionIds(leaves, scrollTop, current.win.innerHeight, totals).filter(
       (id) => !readSectionIds.value.includes(id),
     )
@@ -91,12 +102,25 @@ export function useReaderFrame(path: string) {
     saveTimer = setTimeout(() => saveNow(), SAVE_DELAY_MS)
   }
 
+  // スクロールせずに読み続けていても、滞在時間がたまった時点で既読を付ける
+  function scheduleSettle(): void {
+    if (settleTimer !== null) clearTimeout(settleTimer)
+    settleTimer = setTimeout(() => {
+      settleTimer = null
+      if (document.visibilityState === 'hidden') return
+      const before = readSectionIds.value.length
+      update(true)
+      if (readSectionIds.value.length !== before) scheduleSave()
+    }, SETTLE_MS)
+  }
+
   function onScroll(): void {
     if (throttleTimer !== null) return
     throttleTimer = setTimeout(() => {
       throttleTimer = null
       update(Date.now() >= programmaticUntil)
       scheduleSave()
+      scheduleSettle()
     }, SCROLL_THROTTLE_MS)
   }
 
@@ -129,6 +153,7 @@ export function useReaderFrame(path: string) {
         return
       }
       dwell.resume(Date.now())
+      scheduleSettle()
     }
     win.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('pagehide', onPageHide)
@@ -139,6 +164,8 @@ export function useReaderFrame(path: string) {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       if (throttleTimer !== null) clearTimeout(throttleTimer)
       throttleTimer = null
+      if (settleTimer !== null) clearTimeout(settleTimer)
+      settleTimer = null
     }
     return opened
   }
@@ -150,6 +177,7 @@ export function useReaderFrame(path: string) {
     current.win.scrollTo({ top, behavior: 'instant' })
     update(false)
     scheduleSave()
+    scheduleSettle()
   }
 
   function goToPosition(target: ReadingPosition): boolean {
@@ -196,6 +224,7 @@ export function useReaderFrame(path: string) {
   function markOpened(): void {
     update(false)
     saveNow()
+    scheduleSettle()
   }
 
   onBeforeUnmount(() => {

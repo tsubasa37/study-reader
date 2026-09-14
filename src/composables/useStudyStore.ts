@@ -1,10 +1,12 @@
 import { computed, reactive } from 'vue'
+import { DEFAULT_HIGHLIGHT_COLOR_NAMES } from '../../shared/constants'
 import type {
   Bookmark,
   BookmarkPatch,
   DocumentEntry,
   DocumentProgress,
   Highlight,
+  HighlightColorNames,
   HighlightPatch,
   MoveDocumentResult,
   NewBookmark,
@@ -20,6 +22,7 @@ type StoreState = {
   progress: Record<string, DocumentProgress>
   bookmarks: Bookmark[]
   highlights: Highlight[]
+  highlightColorNames: HighlightColorNames
 }
 
 const state = reactive<StoreState>({
@@ -29,17 +32,19 @@ const state = reactive<StoreState>({
   progress: {},
   bookmarks: [],
   highlights: [],
+  highlightColorNames: { ...DEFAULT_HIGHLIGHT_COLOR_NAMES },
 })
 
 let loading: Promise<void> | null = null
 
 async function fetchAll(): Promise<void> {
-  const [list, study] = await Promise.all([api.documents(), api.state()])
+  const [list, study, settings] = await Promise.all([api.documents(), api.state(), api.settings()])
   state.vaultName = list.vaultName
   state.documents = list.documents
   state.progress = study.progress
   state.bookmarks = study.bookmarks
   state.highlights = study.highlights
+  state.highlightColorNames = settings.highlightColorNames
   state.loaded = true
 }
 
@@ -94,6 +99,11 @@ async function deleteHighlight(id: string): Promise<void> {
   state.highlights = state.highlights.filter((item) => item.id !== id)
 }
 
+async function saveHighlightColorNames(names: HighlightColorNames): Promise<void> {
+  const saved = await api.saveSettings({ highlightColorNames: names })
+  state.highlightColorNames = saved.highlightColorNames
+}
+
 async function reloadAll(): Promise<void> {
   loading = null
   await loadStudyState()
@@ -135,6 +145,7 @@ export function useStudyStore() {
     addHighlight,
     updateHighlight,
     deleteHighlight,
+    saveHighlightColorNames,
     moveDocument,
   }
 }

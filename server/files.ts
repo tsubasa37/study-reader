@@ -27,13 +27,14 @@ const CONTENT_TYPES: Record<string, string> = {
 }
 
 // 教材の中のスクリプトは動いたままにして（教材自身の目次や色付けが壊れるため）、
-// 外との通信と外部ファイルの読み込みだけ止める。教材が記録を外へ送ることはできない
+// 外との通信と外部ファイルの読み込みは止める（教材が使う Google Fonts だけ許可）。
+// ただし親画面と同じオリジンで表示するので、教材のスクリプトが親画面を通して通信することまでは防げない
 export const VAULT_CSP = [
   "default-src 'none'",
   "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline'",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data:",
-  "font-src 'self' data:",
+  "font-src 'self' data: https://fonts.gstatic.com",
   "media-src 'self'",
   "connect-src 'none'",
   "form-action 'none'",

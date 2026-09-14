@@ -56,13 +56,33 @@ export type NoteEntry = {
   createdAt: string
 }
 
-// 一覧では「位置を見失ったか」を、検索結果では資料名を添える
+// 一覧のハイライトには「位置を見失ったか」を、検索結果としおりの一覧には資料名を添える
 export type NoteListEntry = NoteEntry & { lost: boolean }
 export type NoteHit = NoteEntry & { name: string }
 
 export type NoteGroup = {
   path: string
   name: string
+  // 資料が入っているプロジェクト。フォルダに入れていなければ ''
+  project: string
   entries: NoteListEntry[]
 }
+
+export type NotePlace = { kind: 'all' } | { kind: 'project'; folder: string } | { kind: 'document'; path: string }
+
+export type HighlightFilter = {
+  place: NotePlace
+  color: HighlightColor | null
+  text: string
+}
+
+export type TreeDocument = { path: string; name: string; count: number }
+
+export type HighlightTree = {
+  count: number
+  projects: { folder: string; count: number; documents: TreeDocument[] }[]
+  loose: TreeDocument[]
+}
+
+export type ColorCounts = Record<HighlightColor, number> & { all: number }
 

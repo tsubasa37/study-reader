@@ -5,12 +5,14 @@ export type {
   BookmarkPatch,
   DocumentProgress,
   Highlight,
+  HighlightColorNames,
   HighlightPatch,
   NewBookmark,
   MoveDocument,
   NewHighlight,
   ReadingPosition,
   RecordsMove,
+  Settings,
   TextQuote,
 } from './schemas'
 export type { HighlightColor } from './constants'

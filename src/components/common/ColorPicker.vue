@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_LABELS, type HighlightColor } from '../../../shared/constants'
+import { HIGHLIGHT_COLORS, type HighlightColor } from '../../../shared/constants'
+import { useStudyStore } from '../../composables/useStudyStore'
 import { swatchBackground } from '../../lib/highlightPainter'
+import { colorTitle } from '../../lib/labels'
 
 defineProps<{ value: HighlightColor }>()
 const emit = defineEmits<{ change: [color: HighlightColor] }>()
+const store = useStudyStore()
 </script>
 
 <template>
@@ -14,7 +17,8 @@ const emit = defineEmits<{ change: [color: HighlightColor] }>()
       type="button"
       :style="{ background: swatchBackground(color) }"
       :aria-pressed="color === value"
-      :aria-label="`${HIGHLIGHT_COLOR_LABELS[color]}に変える`"
+      :aria-label="`${colorTitle(store.state.highlightColorNames, color)}に変える`"
+      :title="`${colorTitle(store.state.highlightColorNames, color)}に変える`"
       @click="emit('change', color)"
     />
   </div>

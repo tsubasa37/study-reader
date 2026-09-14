@@ -4,7 +4,7 @@ export const MAX_DWELL_STEP_MS = 5000
 // 章ごとの滞在時間を測る。通り過ぎただけの章を既読にしないために使う
 export class DwellTracker {
   private readonly totals = new Map<string, number>()
-  private current: string | null = null
+  private current: readonly string[] = []
   private since = 0
   private paused = false
 
@@ -12,18 +12,18 @@ export class DwellTracker {
 
   start(now: number): void {
     this.totals.clear()
-    this.current = null
+    this.current = []
     this.since = now
     this.paused = false
   }
 
-  // 今いる章を伝える。前の章にはここまでの滞在を足す
-  move(sectionId: string | null, now: number): ReadonlyMap<string, number> {
-    if (this.current !== null && !this.paused) {
+  // 今画面に見えている章を伝える。前に見えていた章それぞれに、ここまでの滞在を足す
+  move(sectionIds: readonly string[], now: number): ReadonlyMap<string, number> {
+    if (!this.paused) {
       const elapsed = Math.min(Math.max(0, now - this.since), this.maxStepMs)
-      this.totals.set(this.current, (this.totals.get(this.current) ?? 0) + elapsed)
+      for (const id of this.current) this.totals.set(id, (this.totals.get(id) ?? 0) + elapsed)
     }
-    this.current = sectionId
+    this.current = sectionIds
     this.since = now
     this.paused = false
     return this.totals

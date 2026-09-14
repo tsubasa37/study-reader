@@ -55,11 +55,20 @@ export async function moveDocument(
       moved.push({ from, to, name })
     }
   } catch (error) {
-    // 途中で失敗したら、動かした分を元に戻してから知らせる
+    // 途中で失敗したら、動かした分を元に戻してから知らせる。戻せなかったものは残った場所を伝える
+    const stranded: string[] = []
     for (const done of [...moved].reverse()) {
-      await rename(done.to, done.from).catch(() => undefined)
+      try {
+        await rename(done.to, done.from)
+      } catch (rollbackError) {
+        stranded.push(`${shown(done.name)}（${(rollbackError as Error).message}）`)
+      }
     }
-    throw new HttpError(500, `移動できませんでした（${(error as Error).message}）。元の場所に戻しました`)
+    const reason = `移動できませんでした（${(error as Error).message}）。`
+    if (stranded.length > 0) {
+      throw new HttpError(500, `${reason}元に戻せなかったファイルが移動先に残っています: ${stranded.join('、')}`)
+    }
+    throw new HttpError(500, `${reason}元の場所に戻しました`)
   }
 
   const newPath = shown(basename(path))

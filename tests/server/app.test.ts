@@ -248,6 +248,29 @@ describe('記録はフォルダの中身に自動で合わせる', () => {
     expect(current.progress['B/教材.html']).toBeUndefined()
     expect(current.bookmarks).toEqual([])
   })
+
+  it('同じ名前の別の資料にすでに記録があれば、混ぜずにしまっておく', async () => {
+    for (const folder of ['A', 'B']) {
+      await mkdir(join(vault.dir, folder), { recursive: true })
+      await writeFile(join(vault.dir, folder, '教材.html'), `<p>${folder}</p>`, 'utf8')
+    }
+    await send('PUT', '/api/progress', progress({ path: 'A/教材.html', readSectionIds: ['a1', 'a2'] }))
+    await send('PUT', '/api/progress', progress({ path: 'B/教材.html', readSectionIds: ['b1'] }))
+    await send('POST', '/api/highlights', { ...highlight('A/教材.html'), memo: 'Aのメモ' })
+    await rm(join(vault.dir, 'A', '教材.html'))
+
+    await state()
+    const current = await state()
+
+    expect(current.progress['B/教材.html']?.readSectionIds).toEqual(['b1'])
+    expect(current.highlights).toEqual([])
+    const archive = JSON.parse(await readFile(join(vault.dir, '.study', 'archive.json'), 'utf8')) as {
+      progress: Record<string, unknown>
+      highlights: { memo: string }[]
+    }
+    expect(archive.progress['A/教材.html']).toBeDefined()
+    expect(archive.highlights.map((item) => item.memo)).toEqual(['Aのメモ'])
+  })
 })
 
 describe('資料の移動', () => {
@@ -442,6 +465,21 @@ describe('教材の配信', () => {
     expect(response.headers.get('content-security-policy')).toContain("connect-src 'none'")
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('last-modified')).not.toBeNull()
+  })
+
+  it('教材が使う Google Fonts だけは外から読み込める', async () => {
+    const response = await send('GET', `/vault/${encodeURIComponent(DOC)}`)
+    const directives = new Map(
+      (response.headers.get('content-security-policy') ?? '').split(';').map((directive) => {
+        const [name = '', ...sources] = directive.trim().split(/\s+/)
+        return [name, sources] as const
+      }),
+    )
+
+    expect(directives.get('style-src')).toContain('https://fonts.googleapis.com')
+    expect(directives.get('font-src')).toContain('https://fonts.gstatic.com')
+    expect(directives.get('script-src')).toEqual(["'unsafe-inline'"])
+    expect(directives.get('connect-src')).toEqual(["'none'"])
   })
 
   it('更新されていなければ 304 を返す', async () => {

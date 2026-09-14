@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { HIGHLIGHT_COLORS } from './constants'
+import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_NAME_MAX } from './constants'
 
 const documentPath = z.string().min(1).max(1024)
 const timestamp = z.iso.datetime()
@@ -88,6 +88,16 @@ export const MoveDocumentSchema = z.object({
   folder: z.string().max(200),
 })
 
+// 4色すべてに名前を持たせる
+export const HighlightColorNamesSchema = z.record(
+  HighlightColorSchema,
+  z.string().trim().min(1).max(HIGHLIGHT_COLOR_NAME_MAX),
+)
+
+export const SettingsSchema = z.object({
+  highlightColorNames: HighlightColorNamesSchema,
+})
+
 export const ProgressFileSchema = z.object({
   version: z.literal(1),
   documents: z.record(z.string(), DocumentProgressSchema),
@@ -111,6 +121,10 @@ export const ArchiveFileSchema = z.object({
   highlights: z.array(HighlightSchema),
 })
 
+export const SettingsFileSchema = SettingsSchema.extend({
+  version: z.literal(1),
+})
+
 export type ReadingPosition = z.infer<typeof ReadingPositionSchema>
 export type DocumentProgress = z.infer<typeof DocumentProgressSchema>
 export type TextQuote = z.infer<typeof TextQuoteSchema>
@@ -126,3 +140,6 @@ export type ProgressFile = z.infer<typeof ProgressFileSchema>
 export type BookmarksFile = z.infer<typeof BookmarksFileSchema>
 export type HighlightsFile = z.infer<typeof HighlightsFileSchema>
 export type ArchiveFile = z.infer<typeof ArchiveFileSchema>
+export type HighlightColorNames = z.infer<typeof HighlightColorNamesSchema>
+export type Settings = z.infer<typeof SettingsSchema>
+export type SettingsFile = z.infer<typeof SettingsFileSchema>

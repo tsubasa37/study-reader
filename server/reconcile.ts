@@ -27,19 +27,29 @@ export async function reconcileRecords(
     ...state.bookmarks.map((item) => item.path),
     ...state.highlights.map((item) => item.path),
   ])
+  // すでに記録を持つ資料へは付け替えない。同じ名前の別の資料に記録が混ざるのを防ぐ
+  const occupied = new Set([...recorded].filter((path) => known.has(path)))
+  const vacantMatch = (path: string): string | null => {
+    const target = soleMatch(path)
+    return target !== null && !occupied.has(target) ? target : null
+  }
+
   for (const path of recorded) {
     if (known.has(path)) continue
-    const target = soleMatch(path)
+    const target = vacantMatch(path)
     if (target === null) {
       await repository.archiveRecords(path)
       continue
     }
     await repository.relocateRecords(path, target)
+    occupied.add(target)
   }
 
   // しまってある記録は、同じ名前の資料が戻ってきたら元に戻す
   for (const path of await repository.archivedPaths()) {
-    const target = known.has(path) ? path : soleMatch(path)
-    if (target !== null) await repository.restoreArchived(path, target)
+    const target = known.has(path) ? path : vacantMatch(path)
+    if (target === null) continue
+    await repository.restoreArchived(path, target)
+    occupied.add(target)
   }
 }

@@ -10,6 +10,7 @@ import type {
   MoveDocumentResult,
   NewBookmark,
   NewHighlight,
+  Settings,
   StudyState,
 } from '../../shared/types'
 
@@ -53,6 +54,8 @@ export const api = {
   state: () => request<StudyState>('GET', '/api/state'),
   saveProgress: (entry: DocumentProgress, keepalive: boolean) =>
     request<DocumentProgress>('PUT', '/api/progress', entry, keepalive),
+  settings: () => request<Settings>('GET', '/api/settings'),
+  saveSettings: (settings: Settings) => request<Settings>('PUT', '/api/settings', settings),
 
   addBookmark: (input: NewBookmark) => request<Bookmark>('POST', '/api/bookmarks', input),
   updateBookmark: (id: string, patch: BookmarkPatch) =>

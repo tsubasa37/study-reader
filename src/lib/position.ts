@@ -12,7 +12,7 @@ export const READING_LINE = 80
 // 章の終わりがこの距離より下に見えていれば、その章を読み終えたとみなす
 const FINISH_MARGIN = 40
 
-// 読んでいる線がこの時間その章にとどまったら、通り過ぎたのではなく読んだとみなす
+// 章がこの時間画面に見えていたら、通り過ぎたのではなく読んだとみなす
 export const READ_DWELL_MS = 4000
 
 const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, value))
@@ -43,7 +43,19 @@ export function scrollTopFor(
   return { top: clamp(top, 0, maxScroll), sectionFound: true }
 }
 
-// 読み終えた章 = しばらく読んでいた章のうち、章の終わりが画面に見えている章。
+// 画面に少しでも入っている章
+export function visibleSectionIds(
+  boxes: readonly SectionBox[],
+  scrollTop: number,
+  viewportHeight: number,
+): string[] {
+  const viewBottom = scrollTop + viewportHeight
+  return boxes
+    .filter((box) => box.height > 0 && box.top < viewBottom && box.top + box.height > scrollTop)
+    .map((box) => box.id)
+}
+
+// 読み終えた章 = しばらく画面に見えていた章のうち、章の終わりが画面に見えている章。
 // 目次リンクで一気に飛んだときは、通過した章の滞在時間がごく短いので既読にならない
 export function finishedSectionIds(
   leafBoxes: readonly SectionBox[],

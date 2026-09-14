@@ -50,3 +50,11 @@
   padding: 2px 6px;
   font-size: 12px;
 }
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 50%;
+}

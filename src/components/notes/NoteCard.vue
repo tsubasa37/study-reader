@@ -1,31 +1,38 @@
 <script setup lang="ts">
-import { Bookmark, CircleAlert, Highlighter } from '@lucide/vue'
+import { CircleAlert, Highlighter } from '@lucide/vue'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useStudyStore } from '../../composables/useStudyStore'
 import { formatWhen } from '../../lib/format'
-import { NO_EXCERPT, NO_SECTION } from '../../lib/labels'
+import { swatchBackground } from '../../lib/highlightPainter'
+import { NO_SECTION } from '../../lib/labels'
 import type { NoteListEntry } from '../../types/ui'
 import HighlightQuote from '../common/HighlightQuote.vue'
 
 const props = defineProps<{ entry: NoteListEntry }>()
+const store = useStudyStore()
 
-const target = computed(() => ({ name: 'read', query: { path: props.entry.path, [props.entry.kind]: props.entry.id } }))
+const target = computed(() => ({ name: 'read', query: { path: props.entry.path, highlight: props.entry.id } }))
 </script>
 
 <template>
   <li class="note-item card">
     <RouterLink class="note-go" :to="target">
       <span class="note-where">
-        <Highlighter v-if="entry.kind === 'highlight'" :size="12" />
-        <Bookmark v-else :size="12" />
+        <Highlighter :size="12" />
         {{ entry.sectionTitle ?? NO_SECTION }}
       </span>
-      <HighlightQuote v-if="entry.kind === 'highlight' && entry.color" :text="entry.text" :color="entry.color" />
-      <span v-else class="excerpt">{{ entry.text || NO_EXCERPT }}</span>
+      <HighlightQuote v-if="entry.color" :text="entry.text" :color="entry.color" />
     </RouterLink>
     <p v-if="entry.memo" class="memo">{{ entry.memo }}</p>
     <div class="note-meta">
-      <span class="num">{{ formatWhen(entry.createdAt) }}</span>
+      <span class="when">
+        <span class="num">{{ formatWhen(entry.createdAt) }}</span>
+        <span v-if="entry.color" class="color-name">
+          <span class="swatch" :style="{ background: swatchBackground(entry.color) }" />
+          {{ store.state.highlightColorNames[entry.color] }}
+        </span>
+      </span>
       <span v-if="entry.lost" class="lost"><CircleAlert :size="12" />位置を見失った</span>
     </div>
   </li>
@@ -43,11 +50,6 @@ const target = computed(() => ({ name: 'read', query: { path: props.entry.path, 
   align-items: center;
 }
 
-.excerpt {
-  color: var(--ink);
-  font-size: 13.5px;
-}
-
 .memo {
   margin: 0;
   padding-left: 10px;
@@ -55,6 +57,21 @@ const target = computed(() => ({ name: 'read', query: { path: props.entry.path, 
   color: var(--ink);
   font-size: 13.5px;
   white-space: pre-wrap;
+}
+
+.when,
+.color-name {
+  display: inline-flex;
+  align-items: center;
+}
+
+.when {
+  gap: 12px;
+}
+
+.color-name {
+  gap: 5px;
+  color: var(--ink-2);
 }
 
 .lost {

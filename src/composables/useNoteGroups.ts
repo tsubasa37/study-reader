@@ -1,53 +1,109 @@
 import { computed, type Ref } from 'vue'
 import { locateQuote } from '../lib/anchoring'
+import { bookmarkToNote, highlightToNote } from '../lib/notes'
+import { projectFolderOf } from '../lib/projects'
 import type { IndexedDocument } from '../lib/search'
 import { matchesText } from '../lib/search'
-import { toNotes } from '../lib/notes'
-import type { NoteGroup, NoteListEntry } from '../types/ui'
+import type {
+  ColorCounts,
+  HighlightFilter,
+  HighlightTree,
+  NoteGroup,
+  NoteHit,
+  NoteListEntry,
+  NotePlace,
+  TreeDocument,
+} from '../types/ui'
 import { useStudyStore } from './useStudyStore'
 
-export type NoteFilter = {
-  kind: 'all' | 'bookmark' | 'highlight'
-  path: string
-  text: string
-}
+const ALL_PLACES: NotePlace = { kind: 'all' }
 
-// 全資料のしおりとハイライトを資料ごとにまとめ、見失ったハイライトに印を付ける
-export function useNoteGroups(filter: Ref<NoteFilter>, indexed: Ref<IndexedDocument[]>) {
+const newestFirst = (a: { createdAt: string }, b: { createdAt: string }) => b.createdAt.localeCompare(a.createdAt)
+
+const inPlace = (entry: NoteListEntry, place: NotePlace) =>
+  place.kind === 'all' ||
+  (place.kind === 'project' ? projectFolderOf(entry.path) === place.folder : entry.path === place.path)
+
+// しおりは新しい順に並べるだけ。ハイライトは資料の木と色の名前で絞り込み、見失ったものに印を付ける
+export function useNoteGroups(filter: Ref<HighlightFilter>, indexed: Ref<IndexedDocument[]>) {
   const store = useStudyStore()
 
-  const entries = computed<NoteListEntry[]>(() => {
+  const nameOf = (path: string) => store.documentsByPath.value.get(path)?.name ?? path
+
+  const highlights = computed<NoteListEntry[]>(() => {
     const texts = new Map(indexed.value.map((document) => [document.path, document.text]))
-    const quoteOf = new Map(store.state.highlights.map((item) => [item.id, item]))
-    return toNotes(store.state.bookmarks, store.state.highlights).map((note) => {
-      const highlight = note.kind === 'highlight' ? quoteOf.get(note.id) : undefined
-      const text = highlight === undefined ? undefined : texts.get(highlight.path)
+    return store.state.highlights.map((item) => {
+      const text = texts.get(item.path)
       // 本文を読み込めている資料だけ、ハイライトが見つかるかを見る
-      return { ...note, lost: highlight !== undefined && text !== undefined && locateQuote(text, highlight.quote) === null }
+      return { ...highlightToNote(item), lost: text !== undefined && locateQuote(text, item.quote) === null }
     })
   })
 
+  const bookmarks = computed<NoteHit[]>(() =>
+    store.state.bookmarks.map((item) => ({ ...bookmarkToNote(item), name: nameOf(item.path) })).sort(newestFirst),
+  )
+
+  const counts = computed(() => ({ highlight: store.state.highlights.length, bookmark: store.state.bookmarks.length }))
+
+  // 本棚と同じ並び。プロジェクト名順に資料を並べ、フォルダに入れていない資料は最後
+  const shelfOrder = computed(() => {
+    const inFolder = (folder: string) =>
+      store.state.documents.filter((document) => projectFolderOf(document.path) === folder)
+    const ordered = [...store.projectFolders.value.flatMap(inFolder), ...inFolder('')]
+    return new Map(ordered.map((document, index) => [document.path, index]))
+  })
+  const byShelf = (a: string, b: string) =>
+    (shelfOrder.value.get(a) ?? Number.MAX_SAFE_INTEGER) - (shelfOrder.value.get(b) ?? Number.MAX_SAFE_INTEGER)
+
+  const matchesColor = (entry: NoteListEntry) => filter.value.color === null || entry.color === filter.value.color
+  const matchesQuery = (entry: NoteListEntry) =>
+    filter.value.text.trim() === '' || matchesText([entry.text, entry.memo, entry.sectionTitle ?? ''], filter.value.text)
+
+  // ハイライトが2つ以上の資料にまたがるときだけ、資料で絞り込む木を出す
+  const tree = computed<HighlightTree | null>(() => {
+    const paths = [...new Set(highlights.value.map((entry) => entry.path))].sort(byShelf)
+    if (paths.length < 2) return null
+    const counted = highlights.value.filter((entry) => matchesColor(entry) && matchesQuery(entry))
+    const documentsIn = (folder: string): TreeDocument[] =>
+      paths
+        .filter((path) => projectFolderOf(path) === folder)
+        .map((path) => ({ path, name: nameOf(path), count: counted.filter((entry) => entry.path === path).length }))
+    const folders = [...new Set(paths.map(projectFolderOf))].filter((folder) => folder !== '')
+    return {
+      count: counted.length,
+      projects: folders.map((folder) => {
+        const documents = documentsIn(folder)
+        return { folder, count: documents.reduce((sum, document) => sum + document.count, 0), documents }
+      }),
+      loose: documentsIn(''),
+    }
+  })
+
+  const placed = computed(() => {
+    const place = tree.value === null ? ALL_PLACES : filter.value.place
+    return highlights.value.filter((entry) => inPlace(entry, place) && matchesQuery(entry))
+  })
+
+  const colorCounts = computed<ColorCounts>(() => {
+    const result: ColorCounts = { all: placed.value.length, yellow: 0, green: 0, pink: 0, blue: 0 }
+    for (const entry of placed.value) if (entry.color !== null) result[entry.color]++
+    return result
+  })
+
   const groups = computed<NoteGroup[]>(() => {
-    const { kind, path, text } = filter.value
-    const visible = entries.value.filter(
-      (entry) =>
-        (kind === 'all' || entry.kind === kind) &&
-        (path === '' || entry.path === path) &&
-        (text.trim() === '' || matchesText([entry.text, entry.memo, entry.sectionTitle ?? ''], text)),
-    )
-    const order = new Map(store.state.documents.map((document, index) => [document.path, index]))
     const byPath = new Map<string, NoteListEntry[]>()
-    for (const entry of visible) byPath.set(entry.path, [...(byPath.get(entry.path) ?? []), entry])
+    for (const entry of placed.value.filter(matchesColor)) byPath.set(entry.path, [...(byPath.get(entry.path) ?? []), entry])
     return [...byPath.entries()]
-      .map(([groupPath, groupEntries]) => ({
-        path: groupPath,
-        name: store.documentsByPath.value.get(groupPath)?.name ?? groupPath,
-        entries: groupEntries.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      .sort(([a], [b]) => byShelf(a, b))
+      .map(([path, entries]) => ({
+        path,
+        name: nameOf(path),
+        project: projectFolderOf(path),
+        entries: entries.sort(newestFirst),
       }))
-      .sort((a, b) => (order.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.path) ?? Number.MAX_SAFE_INTEGER))
   })
 
   const total = computed(() => groups.value.reduce((sum, group) => sum + group.entries.length, 0))
 
-  return { groups, total }
+  return { groups, total, tree, colorCounts, bookmarks, counts }
 }
