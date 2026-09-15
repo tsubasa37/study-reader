@@ -12,6 +12,6 @@ const isPdf = computed(() => documentKindOf(props.path) === 'pdf')
 </script>
 
 <template>
-  <PdfReaderPage v-if="isPdf" :path="path" />
+  <PdfReaderPage v-if="isPdf" :path="path" :bookmark-id="bookmarkId" />
   <ReaderPage v-else :path="path" :bookmark-id="bookmarkId" :highlight-id="highlightId" />
 </template>

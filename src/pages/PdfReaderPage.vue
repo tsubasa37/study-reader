@@ -1,59 +1,37 @@
 <script setup lang="ts">
 import 'pdfjs-dist/web/pdf_viewer.css'
 import { Minus, Plus } from '@lucide/vue'
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { useTemplateRef } from 'vue'
 import { RouterLink } from 'vue-router'
+import BookmarksTab from '../components/reader/BookmarksTab.vue'
 import PdfTocTab from '../components/reader/PdfTocTab.vue'
 import ReaderBar from '../components/reader/ReaderBar.vue'
 import SidePanel from '../components/reader/SidePanel.vue'
-import { notify } from '../composables/useNotices'
-import { usePdfReader } from '../composables/usePdfReader'
-import { useSearchDialog } from '../composables/useSearchDialog'
-import { loadStudyState, useStudyStore } from '../composables/useStudyStore'
-import { pdfPlaceLabel } from '../lib/pdfOutline'
-import type { PanelTab } from '../types/ui'
+import { usePdfReaderPage } from '../composables/usePdfReaderPage'
 
-const props = defineProps<{ path: string }>()
+const props = defineProps<{ path: string; bookmarkId: string | null }>()
 
-const store = useStudyStore()
-const search = useSearchDialog()
-const reader = usePdfReader(props.path)
-const panelOpen = ref(true)
-const panelTab = ref<PanelTab>('toc')
 const container = useTemplateRef<HTMLDivElement>('container')
 const pages = useTemplateRef<HTMLDivElement>('pages')
+const page = usePdfReaderPage(props, { container, pages })
+const { store, reader, panelOpen, panelTab } = page
 
-const entry = computed(() => store.documentsByPath.value.get(props.path) ?? null)
-const place = computed(() =>
-  reader.loading.value ? null : pdfPlaceLabel(reader.currentEntry.value, reader.pageNumber.value),
-)
-const meter = computed(() =>
-  reader.pageCount.value === 0
-    ? null
-    : { ratio: reader.position.value?.scrollRatio ?? 0, label: `p.${reader.pageNumber.value} / ${reader.pageCount.value}` },
-)
-
-onMounted(async () => {
-  await loadStudyState()
-  if (entry.value === null) return
-  await nextTick()
-  if (container.value === null || pages.value === null) throw new Error('PDF を表示する場所を用意できませんでした')
-  const found = await reader.open(container.value, pages.value)
-  if (!found) notify('前回のページがこの PDF に無いので、だいたいの位置に戻しました（PDF が差し替えられた可能性があります）')
-  await reader.loadOutline()
-})
+function removeBookmark(id: string): void {
+  if (window.confirm('このしおりを外しますか？')) void store.deleteBookmark(id)
+}
 </script>
 
 <template>
   <div class="reader">
     <ReaderBar
-      :title="entry?.name ?? path"
-      :section-title="place"
+      :title="page.entry.value?.name ?? path"
+      :section-title="page.place.value"
       :panel-open="panelOpen"
       :doc-nav-hidden="null"
       is-pdf
-      :can-bookmark="false"
-      @search="search.show"
+      :bookmark-disabled="reader.loading.value"
+      @bookmark="page.addBookmark"
+      @search="page.search.show"
       @toggle-panel="panelOpen = !panelOpen"
     >
       <template #tools>
@@ -90,7 +68,7 @@ onMounted(async () => {
         </div>
       </template>
     </ReaderBar>
-    <p v-if="store.state.loaded && entry === null" class="missing">
+    <p v-if="store.state.loaded && page.entry.value === null" class="missing">
       この資料は資料フォルダにありません: {{ path }}
       <RouterLink to="/">本棚へ戻る</RouterLink>
     </p>
@@ -104,20 +82,30 @@ onMounted(async () => {
       <SidePanel
         v-if="panelOpen"
         v-model:tab="panelTab"
-        :tabs="['toc']"
-        :bookmark-count="0"
+        :tabs="['toc', 'bookmarks']"
+        :bookmark-count="page.bookmarks.value.length"
         :highlight-count="0"
         :read-count="0"
         :leaf-count="0"
-        :meter="meter"
+        :meter="page.meter.value"
       >
         <template #toc>
           <PdfTocTab
             :entries="reader.toc.value"
-            :has-outline="reader.outline.value.length > 0"
             :state="reader.outlineState.value"
+            :has-outline="reader.outline.value.length > 0"
             :current-id="reader.currentEntry.value?.id ?? null"
             @go="reader.goToPage"
+          />
+        </template>
+        <template #bookmarks>
+          <BookmarksTab
+            :items="page.bookmarks.value"
+            :active-id="page.activeBookmarkId.value"
+            :edit-id="page.editRequestId.value"
+            @go="page.jumpToBookmark"
+            @save-memo="(id, memo) => store.updateBookmark(id, { memo })"
+            @remove="removeBookmark"
           />
         </template>
       </SidePanel>

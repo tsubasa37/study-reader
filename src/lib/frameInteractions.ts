@@ -10,7 +10,7 @@ export type FrameHandlers = {
 }
 
 const EXCERPT_BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, pre, dd, dt, td, th, figcaption, blockquote, summary'
-const EXCERPT_LENGTH = 80
+export const EXCERPT_LENGTH = 80
 
 export function decodeVaultPath(pathname: string): string {
   return pathname

@@ -1,11 +1,15 @@
+import type { TextContent } from 'pdfjs-dist/types/src/display/api'
+import type { PageViewport } from 'pdfjs-dist/types/src/display/page_viewport'
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import type { ReadingPosition } from '../../shared/types'
 import { vaultUrl } from '../lib/api'
+import { EXCERPT_LENGTH } from '../lib/frameInteractions'
+import { excerptBelow, type TextBox } from '../lib/pdfExcerpt'
 import { flattenOutline, pageList, tocEntryAt, type OutlineState, type PdfTocEntry } from '../lib/pdfOutline'
 import { pageBoxes, pageNumberOf } from '../lib/pdfPosition'
 import { pdfProgressEntry } from '../lib/pdfProgress'
 import { PDFJS_ASSET_OPTIONS, loadPdfjs, type Pdfjs } from '../lib/pdfjs'
-import { positionAt, scrollTopFor, type SectionBox } from '../lib/position'
+import { READING_LINE, positionAt, scrollTopFor, type SectionBox } from '../lib/position'
 import { reportError } from './useNotices'
 import { useStudyStore } from './useStudyStore'
 
@@ -85,6 +89,7 @@ export function usePdfReader(path: string) {
     }, SCROLL_THROTTLE_MS)
   }
 
+  // 記録した位置へ移る。記録したページが今の PDF に無ければ、全体の割合で移って false を返す
   function goToPosition(target: ReadingPosition): boolean {
     if (container === null) return false
     const { top, sectionFound } = scrollTopFor(measure(), target, maxScroll(container))
@@ -112,6 +117,43 @@ export function usePdfReader(path: string) {
     goToPosition(keep)
   }
 
+  function capturePosition(): ReadingPosition {
+    update()
+    if (position.value === null) throw new Error('読んでいる位置を取得できませんでした')
+    return position.value
+  }
+
+  // しおりに添える本文。読んでいる線があるページと次のページの文字を、描画を待たずに PDF から読んで抜き出す
+  async function excerptAtReadingLine(): Promise<string> {
+    const frame = container
+    const current = viewer
+    if (frame === null || current === null) return ''
+    const line = frame.getBoundingClientRect().top + READING_LINE
+    const first = pageNumber.value
+    const boxes: TextBox[] = []
+    for (let number = first; number <= Math.min(first + 1, current.pagesCount); number++) {
+      const pageView = current.getPageView(number - 1)
+      const pageTop = (pageView.div as HTMLDivElement).getBoundingClientRect().top
+      const viewport: PageViewport = pageView.viewport
+      const content: TextContent = await pageView.pdfPage.getTextContent()
+      for (const item of content.items) {
+        if (!('str' in item)) continue
+        const [, baseline] = viewport.convertToViewportPoint(item.transform[4], item.transform[5])
+        boxes.push({
+          top: pageTop + baseline - item.height * viewport.scale,
+          bottom: pageTop + baseline,
+          text: item.hasEOL ? `${item.str} ` : item.str,
+        })
+      }
+    }
+    return excerptBelow(boxes, line, EXCERPT_LENGTH)
+  }
+
+  function markOpened(): void {
+    update()
+    saveNow()
+  }
+
   async function resolvePageNumber(dest: string | readonly unknown[]): Promise<number | null> {
     const doc = pdfDocument
     if (doc === null) throw new Error('PDF を開く前に、目次の飛び先を調べようとしました')
@@ -122,10 +164,10 @@ export function usePdfReader(path: string) {
     return (await doc.getPageIndex(target as Parameters<PdfDocument['getPageIndex']>[0])) + 1
   }
 
-  // PDF を表示し、前回の続きの位置に戻す。前回のページが今の PDF に無ければ false。目次は loadOutline で後から読む
+  // PDF を表示する。画面を離れて途中で止めたときは false。位置の復元と目次の読み込みは呼び出し側で続けて行う
   async function open(frame: HTMLDivElement, pagesElement: HTMLDivElement): Promise<boolean> {
     const pdfjs = await loadPdfjs()
-    if (disposed) return true
+    if (disposed) return false
     const eventBus = new pdfjs.viewer.EventBus()
     const linkService = new pdfjs.viewer.PDFLinkService({ eventBus, externalLinkTarget: pdfjs.viewer.LinkTarget.BLANK })
     const current = new pdfjs.viewer.PDFViewer({
@@ -144,21 +186,21 @@ export function usePdfReader(path: string) {
     destroyTask = () => task.destroy()
     try {
       const doc = await task.promise
-      if (disposed) return true
+      if (disposed) return false
       pdfDocument = doc
       const pagesInit = new Promise<void>((resolve) => eventBus.on('pagesinit', () => resolve(), { once: true }))
       current.setDocument(doc)
       linkService.setDocument(doc)
       await pagesInit
-      if (disposed) return true
+      if (disposed) return false
       current.currentScaleValue = 'auto'
       await current.pagesPromise
-      if (disposed) return true
+      if (disposed) return false
       pageCount.value = doc.numPages
       scalePercent.value = Math.round(current.currentScale * 100)
     } catch (error) {
       // 画面を離れて読み込みを止めたための失敗は、利用者に知らせない
-      if (disposed) return true
+      if (disposed) return false
       throw new Error(`PDF を開けませんでした: ${path}（${(error as Error).message}）`, { cause: error })
     }
     loading.value = false
@@ -175,12 +217,7 @@ export function usePdfReader(path: string) {
       window.removeEventListener('pagehide', onPageHide)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-
-    const saved = store.state.progress[path]
-    const found = saved === undefined ? true : goToPosition(saved.position)
-    update()
-    saveNow()
-    return found
+    return true
   }
 
   // PDF に入っている目次を読む。失敗したらパネルに理由を出し、例外もそのまま投げる
@@ -224,7 +261,11 @@ export function usePdfReader(path: string) {
     currentEntry,
     open,
     loadOutline,
+    markOpened,
+    goToPosition,
     goToPage,
     zoom,
+    capturePosition,
+    excerptAtReadingLine,
   }
 }

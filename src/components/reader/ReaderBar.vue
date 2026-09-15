@@ -12,8 +12,10 @@ withDefaults(
     docNavHidden: boolean | null
     isPdf?: boolean
     canBookmark?: boolean
+    // 読み込み中など、まだ位置を取れない間は押せなくする
+    bookmarkDisabled?: boolean
   }>(),
-  { isPdf: false, canBookmark: true },
+  { isPdf: false, canBookmark: true, bookmarkDisabled: false },
 )
 const emit = defineEmits<{ bookmark: []; search: []; toggleDocNav: []; togglePanel: [] }>()
 </script>
@@ -28,7 +30,7 @@ const emit = defineEmits<{ bookmark: []; search: []; toggleDocNav: []; togglePan
     </div>
     <SearchButton @click="emit('search')" />
     <slot name="tools" />
-    <button v-if="canBookmark" class="btn btn-primary" type="button" @click="emit('bookmark')"><Bookmark :size="15" />しおりを挟む</button>
+    <button v-if="canBookmark" class="btn btn-primary" type="button" :disabled="bookmarkDisabled" @click="emit('bookmark')"><Bookmark :size="15" />しおりを挟む</button>
     <button
       v-if="docNavHidden !== null"
       class="icon-button"
