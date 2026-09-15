@@ -14,7 +14,7 @@ const summary = computed(() => summarizeProgress(props.progress))
   <RouterLink class="resume" :to="{ name: 'read', query: { path: document.path } }">
     <span class="ribbon" aria-hidden="true" />
     <span class="label">前回の続き</span>
-    <strong class="title">{{ document.name }}</strong>
+    <strong class="title">{{ document.name }}<span v-if="document.kind === 'pdf'" class="kind-tag">PDF</span></strong>
     <span class="where">{{ progress.sectionTitle ?? NO_SECTION }}</span>
     <span class="meta num">{{ formatWhen(progress.lastOpenedAt) }} ・ {{ summary.label }}</span>
     <span class="btn btn-primary">続きから読む</span>
@@ -57,6 +57,11 @@ const summary = computed(() => summarizeProgress(props.progress))
 .title {
   font: 600 24px/1.4 var(--f-display);
   text-wrap: balance;
+}
+
+.title .kind-tag {
+  margin-left: 10px;
+  vertical-align: 0.35em;
 }
 
 .where {

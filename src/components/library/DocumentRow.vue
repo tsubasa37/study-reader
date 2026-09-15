@@ -36,7 +36,10 @@ async function move(folder: string): Promise<void> {
   <li class="item">
     <RouterLink class="row" :to="{ name: 'read', query: { path: document.path } }">
       <span class="name">
-        <strong>{{ document.name }}</strong>
+        <span class="title-line">
+          <strong>{{ document.name }}</strong>
+          <span v-if="document.kind === 'pdf'" class="kind-tag">PDF</span>
+        </span>
         <small v-if="showFolder && document.folder">{{ document.folder }}</small>
       </span>
       <span class="progress">
@@ -85,8 +88,16 @@ async function move(folder: string): Promise<void> {
   min-width: 0;
 }
 
+.title-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
 .name strong {
   overflow: hidden;
+  min-width: 0;
   font: 600 16px/1.45 var(--f-display);
   text-overflow: ellipsis;
   white-space: nowrap;

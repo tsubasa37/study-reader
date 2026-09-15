@@ -10,7 +10,7 @@ export const router = createRouter({
     {
       path: '/read',
       name: 'read',
-      component: () => import('./pages/ReaderPage.vue'),
+      component: () => import('./pages/ReadPage.vue'),
       props: (route) => ({
         path: single(route.query.path) ?? '',
         bookmarkId: single(route.query.bookmark),

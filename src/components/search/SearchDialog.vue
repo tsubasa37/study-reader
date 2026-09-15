@@ -64,7 +64,7 @@ async function move(delta: number): Promise<void> {
 
 <template>
   <div class="overlay" @mousedown.self="emit('close')">
-    <div class="dialog" role="dialog" aria-modal="true" aria-label="全教材を検索">
+    <div class="search-dialog" role="dialog" aria-modal="true" aria-label="全教材を検索">
       <div class="input-row">
         <Search :size="18" />
         <input
@@ -113,7 +113,7 @@ async function move(delta: number): Promise<void> {
   background: color-mix(in srgb, var(--ink) 28%, transparent);
 }
 
-.dialog {
+.search-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(760px, calc(100vw - 32px));

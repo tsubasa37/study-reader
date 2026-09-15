@@ -117,6 +117,17 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+.kind-tag {
+  display: inline-block;
+  flex: none;
+  padding: 2px 5px;
+  border: 1px solid var(--ink-3);
+  border-radius: 4px;
+  color: var(--ink-2);
+  font: 600 10.5px/1 var(--f-mono);
+  letter-spacing: 0.06em;
+}
+
 .field {
   width: 100%;
   padding: 7px 10px;

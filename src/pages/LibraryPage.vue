@@ -69,7 +69,7 @@ const resume = computed(() => {
             {{ shelf.projects.length > 0 ? 'フォルダに入れていない資料' : '資料' }}
             <span class="num">{{ looseRows.length }}</span>
           </h2>
-          <p v-if="looseRows.length === 0" class="empty">資料フォルダに HTML の教材がありません。</p>
+          <p v-if="looseRows.length === 0" class="empty">資料フォルダに HTML・PDF の教材がありません。</p>
           <ul v-else class="rows">
             <DocumentRow v-for="row in looseRows" :key="row.document.path" v-bind="row" />
           </ul>

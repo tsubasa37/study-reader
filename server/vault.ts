@@ -1,16 +1,11 @@
 import type { Dirent } from 'node:fs'
 import { readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, join, posix, relative, resolve, sep } from 'node:path'
-import type { DocumentEntry, DocumentKind } from '../shared/types'
+import { documentKindOf } from '../shared/documentKind'
+import type { DocumentEntry } from '../shared/types'
 import { HttpError, hasErrorCode } from './errors'
 
 export const STATE_DIR_NAME = '.study'
-
-const DOCUMENT_KINDS: Record<string, DocumentKind> = {
-  '.html': 'html',
-  '.htm': 'html',
-  '.pdf': 'pdf',
-}
 
 export async function scanDocuments(vaultDir: string): Promise<DocumentEntry[]> {
   const documents: DocumentEntry[] = []
@@ -28,8 +23,8 @@ async function collect(vaultDir: string, dir: string, documents: DocumentEntry[]
       continue
     }
     const extension = extname(entry.name)
-    const kind = DOCUMENT_KINDS[extension.toLowerCase()]
-    if (!entry.isFile() || kind === undefined) continue
+    const kind = documentKindOf(entry.name)
+    if (!entry.isFile() || kind === null) continue
     const info = await stat(fullPath)
     const path = relative(vaultDir, fullPath).split(sep).join('/')
     const folder = posix.dirname(path)

@@ -3,7 +3,18 @@ import { ArrowLeft, Bookmark, PanelLeft, PanelRight } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import SearchButton from '../common/SearchButton.vue'
 
-defineProps<{ title: string; sectionTitle: string | null; panelOpen: boolean; docNavHidden: boolean }>()
+withDefaults(
+  defineProps<{
+    title: string
+    sectionTitle: string | null
+    panelOpen: boolean
+    // null のときは教材の目次を隠すボタンを出さない（PDF には教材の目次が無い）
+    docNavHidden: boolean | null
+    isPdf?: boolean
+    canBookmark?: boolean
+  }>(),
+  { isPdf: false, canBookmark: true },
+)
 const emit = defineEmits<{ bookmark: []; search: []; toggleDocNav: []; togglePanel: [] }>()
 </script>
 
@@ -12,11 +23,14 @@ const emit = defineEmits<{ bookmark: []; search: []; toggleDocNav: []; togglePan
     <RouterLink class="btn btn-ghost" to="/"><ArrowLeft :size="16" />本棚</RouterLink>
     <div class="crumb">
       <strong>{{ title }}</strong>
-      <span v-if="sectionTitle">{{ sectionTitle }}</span>
+      <span v-if="isPdf" class="kind-tag">PDF</span>
+      <span v-if="sectionTitle" class="section">{{ sectionTitle }}</span>
     </div>
     <SearchButton @click="emit('search')" />
-    <button class="btn btn-primary" type="button" @click="emit('bookmark')"><Bookmark :size="15" />しおりを挟む</button>
+    <slot name="tools" />
+    <button v-if="canBookmark" class="btn btn-primary" type="button" @click="emit('bookmark')"><Bookmark :size="15" />しおりを挟む</button>
     <button
+      v-if="docNavHidden !== null"
       class="icon-button"
       type="button"
       :aria-pressed="docNavHidden"
@@ -65,7 +79,11 @@ const emit = defineEmits<{ bookmark: []; search: []; toggleDocNav: []; togglePan
   white-space: nowrap;
 }
 
-.crumb span {
+.crumb .kind-tag {
+  align-self: center;
+}
+
+.crumb .section {
   overflow: hidden;
   color: var(--ink-3);
   font-size: 13px;

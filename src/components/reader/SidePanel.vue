@@ -2,22 +2,44 @@
 import { computed } from 'vue'
 import type { PanelTab } from '../../types/ui'
 
-const props = defineProps<{ bookmarkCount: number; highlightCount: number; readCount: number; leafCount: number }>()
+type Meter = { ratio: number; label: string }
+
+const props = withDefaults(
+  defineProps<{
+    bookmarkCount: number
+    highlightCount: number
+    readCount: number
+    leafCount: number
+    // 出すタブ。指定が無ければ全部
+    tabs?: readonly PanelTab[]
+    // 下の帯。指定が無ければ読了した章の数を出す
+    meter?: Meter | null
+  }>(),
+  { tabs: () => ['toc', 'bookmarks', 'highlights'], meter: undefined },
+)
 const tab = defineModel<PanelTab>('tab', { required: true })
 
-const tabs = computed<{ id: PanelTab; label: string; count: number | null }[]>(() => [
-  { id: 'toc', label: '目次', count: null },
-  { id: 'bookmarks', label: 'しおり', count: props.bookmarkCount },
-  { id: 'highlights', label: 'ハイライト', count: props.highlightCount },
-])
-const ratio = computed(() => (props.leafCount === 0 ? 0 : props.readCount / props.leafCount))
+const tabItems = computed(() =>
+  (
+    [
+      { id: 'toc', label: '目次', count: null },
+      { id: 'bookmarks', label: 'しおり', count: props.bookmarkCount },
+      { id: 'highlights', label: 'ハイライト', count: props.highlightCount },
+    ] satisfies { id: PanelTab; label: string; count: number | null }[]
+  ).filter((item) => props.tabs.includes(item.id)),
+)
+const shownMeter = computed<Meter | null>(() => {
+  if (props.meter !== undefined) return props.meter
+  if (props.leafCount === 0) return null
+  return { ratio: props.readCount / props.leafCount, label: `読了 ${props.readCount} / ${props.leafCount} 章` }
+})
 </script>
 
 <template>
   <aside class="panel" aria-label="目次・しおり・ハイライト">
     <div class="tabs" role="tablist">
       <button
-        v-for="item in tabs"
+        v-for="item in tabItems"
         :key="item.id"
         role="tab"
         type="button"
@@ -32,9 +54,9 @@ const ratio = computed(() => (props.leafCount === 0 ? 0 : props.readCount / prop
       <slot v-else-if="tab === 'bookmarks'" name="bookmarks" />
       <slot v-else name="highlights" />
     </div>
-    <footer v-if="leafCount > 0" class="meter">
-      <div class="track"><span :style="{ width: `${ratio * 100}%` }" /></div>
-      <span class="num">読了 {{ readCount }} / {{ leafCount }} 章</span>
+    <footer v-if="shownMeter" class="meter">
+      <div class="track"><span :style="{ width: `${shownMeter.ratio * 100}%` }" /></div>
+      <span class="num">{{ shownMeter.label }}</span>
     </footer>
   </aside>
 </template>
